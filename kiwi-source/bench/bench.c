@@ -1,6 +1,17 @@
 #include "bench.h"
 
-void _gen_random_key(char *key,int length) {
+/* Checks if function is supported/valid. */
+int function_is_not_supported(char* function) {	
+	return (strcmp(function, "read") != 0 && 
+			strcmp(function, "write") != 0 &&
+			strcmp(function, "mix") != 0);
+}
+
+/* Returns 0 if random key is needed, else retuerns 1 */
+int inquire_random_key(int argc) { return (argc == 4); }
+
+void _random_key(char *key,int length) 
+{
 	int i;
 	char salt[36]= "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -13,11 +24,11 @@ void _print_header(int count)
 	double index_size = (double)((double)(KSIZE + 8 + 1) * count) / 1048576.0;
 	double data_size = (double)((double)(VSIZE + 4) * count) / 1048576.0;
 
-	printf("Keys:\t\t%d bytes each\n",
+	printf("Keys:\t\t%d bytes each\n", 
 			KSIZE);
-	printf("Values: \t%d bytes each\n",
+	printf("Values: \t%d bytes each\n", 
 			VSIZE);
-	printf("Entries:\t%d\n",
+	printf("Entries:\t%d\n", 
 			count);
 	printf("IndexSize:\t%.1f MB (estimated)\n",
 			index_size);
@@ -31,7 +42,7 @@ void _print_environment()
 {
 	time_t now = time(NULL);
 
-	printf("Date:\t\t%s",
+	printf("Date:\t\t%s", 
 			(char*)ctime(&now));
 
 	int num_cpus = 0;
@@ -55,56 +66,41 @@ void _print_environment()
 				strcpy(cpu_type, val);
 			}
 			else if (strcmp("cache size", key) == 0)
-				strncpy(cache_size, val + 1, strlen(val) - 1);
+				strncpy(cache_size, val + 1, strlen(val) - 1);	
 		}
 
 		fclose(cpuinfo);
-		printf("CPU:\t\t%d * %s",
-				num_cpus,
+		printf("CPU:\t\t%d * %s", 
+				num_cpus, 
 				cpu_type);
 
-		printf("CPUCache:\t%s\n",
+		printf("CPUCache:\t%s\n", 
 				cache_size);
 	}
 }
 
 int main(int argc,char** argv)
 {
-	long int count;
+	// Check that main arguments are valid
+	if (argc < 3 || function_is_not_supported(argv[1])) {
+		fprintf(stderr,"Usage: db-bench <write | read> <count> (key)\n");
+		exit(1);
+	}
 
 	srand(time(NULL));
-	if (argc < 3) {
-		fprintf(stderr,"Usage: db-bench <write | read> <count>\n");
-		exit(1);
-	}
 
-	if (strcmp(argv[1], "write") == 0) {
-		int r = 0;
+	long int count = atoi(argv[2]);
+	_print_header(count);
+	_print_environment();
 
-		count = atoi(argv[2]);
-		_print_header(count);
-		_print_environment();
-		if (argc == 4)
-			r = 1;
-		_write_test(count, r);
-		return 1;
-	}
+	if (strcmp(argv[1], "write") == 0)
+		_write_test(count, inquire_random_key(argc));
 
-	if (strcmp(argv[1], "read") == 0) {
-		int r = 0;
+	else if (strcmp(argv[1], "read") == 0)
+		_read_test(count, inquire_random_key(argc));
 
-		count = atoi(argv[2]);
-		_print_header(count);
-		_print_environment();
-		if (argc == 4)
-			r = 1;
+	else
+		_mix_test(count, 0, inquire_random_key(argc));
 
-		_read_test(count, r);
-
-		return 1;
-
-	} else {
-		fprintf(stderr,"Usage: db-bench <write | read> <count> <random>\n");
-		exit(1);
-	}
+	return 1;
 }

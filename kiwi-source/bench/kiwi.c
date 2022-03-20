@@ -26,7 +26,7 @@ void _write_test(long int count, int r)
 	start = get_ustime_sec();
 	for (i = 0; i < count; i++) {
 		if (r)
-			_gen_random_key(key, KSIZE);
+			_random_key(key, KSIZE);
 		else
 			snprintf(key, KSIZE, "key-%d", i);
 		fprintf(stderr, "%d adding %s\n", i, key);
@@ -39,8 +39,8 @@ void _write_test(long int count, int r)
 
 		db_add(db, &sk, &sv);
 		if ((i % 10000) == 0) {
-			fprintf(stderr,"random write finished %d ops%30s\r",
-					i,
+			fprintf(stderr,"random write finished %d ops%30s\r", 
+					i, 
 					"");
 
 			fflush(stderr);
@@ -56,7 +56,7 @@ void _write_test(long int count, int r)
 	printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost:%.3f(sec);\n"
 		,count, (double)(cost / count)
 		,(double)(count / cost)
-		,cost);
+		,cost);	
 }
 
 void _read_test(long int count, int r)
@@ -78,7 +78,7 @@ void _read_test(long int count, int r)
 
 		/* if you want to test random write, use the following */
 		if (r)
-			_gen_random_key(key, KSIZE);
+			_random_key(key, KSIZE);
 		else
 			snprintf(key, KSIZE, "key-%d", i);
 		fprintf(stderr, "%d searching %s\n", i, key);
@@ -89,13 +89,13 @@ void _read_test(long int count, int r)
 			//db_free_data(sv.mem);
 			found++;
 		} else {
-			INFO("not found key#%s",
+			INFO("not found key#%s", 
 					sk.mem);
     	}
 
 		if ((i % 10000) == 0) {
-			fprintf(stderr,"random read finished %d ops%30s\r",
-					i,
+			fprintf(stderr,"random read finished %d ops%30s\r", 
+					i, 
 					"");
 
 			fflush(stderr);
@@ -112,4 +112,9 @@ void _read_test(long int count, int r)
 		(double)(cost / count),
 		(double)(count / cost),
 		cost);
+}
+
+void _mix_test(long int read_count, long int write_count, int r)
+{
+	printf("Umplimented mix function");
 }
