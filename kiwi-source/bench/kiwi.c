@@ -5,29 +5,11 @@
 
 #define DATAS ("testdb")
 
-void update_op_counter(int op_n, char* op)
-{
-	if ((op_n % 10000) == 0) {
-			fprintf(stderr,"random %s finished %d ops%30s\r", 
-					op, op_n, "\n");
-
-			fflush(stderr);
-		}
-}
-
-void request_key(char * key, int random_key_is_required, int op_n)
-{
-	if (random_key_is_required)
-		_random_key(key, KSIZE);
-	else
-		snprintf(key, KSIZE, "key-%d", op_n);
-}
-
 void _write_test(long int count, int r)
 {
 	int i;
 	double cost;
-	long long start, end;
+	long long start,end;
 	Variant sk, sv;
 	DB* db;
 
@@ -40,12 +22,13 @@ void _write_test(long int count, int r)
 	memset(sbuf, 0, 1024);
 
 	db = db_open(DATAS);
+
 	start = get_ustime_sec();
-
 	for (i = 0; i < count; i++) {
-		
-		request_key(key, r, i);
-
+		if (r)
+			_random_key(key, KSIZE);
+		else
+			snprintf(key, KSIZE, "key-%d", i);
 		fprintf(stderr, "%d adding %s\n", i, key);
 		snprintf(val, VSIZE, "val-%d", i);
 
@@ -55,67 +38,86 @@ void _write_test(long int count, int r)
 		sv.mem = val;
 
 		db_add(db, &sk, &sv);
+		if ((i % 10000) == 0) {
+			fprintf(stderr,"random write finished %d ops%30s\r", 
+					i, 
+					"\n");
 
-		update_op_counter(i, "write");
+			fflush(stderr);
+		}
 	}
-	
-	end = get_ustime_sec();
+
 	db_close(db);
 
-	cost = end - start;
+	end = get_ustime_sec();
+	cost = end -start;
 
 	printf(LINE);
-	printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost:%.3f(sec);\n",
-		count, (double)(cost / count),
-		(double)(count / cost),
-		cost);	
+	printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost:%.3f(sec);\n"
+		,count, (double)(cost / count)
+		,(double)(count / cost)
+		,cost);	
 }
 
-void _read_test(long int count, int r)
+void _read_test(void* pars)
 {
-	int i;
-	double cost;
-	long long start, end;
-	Variant sk, sv;
-	DB* db;
 
-	char key[KSIZE + 1];
+	struct Par *parameters = (struct Par*)pars;
+
+	int i;
+	int ret;
 	int found = 0;
+	double cost;
+	long long start,end;
+	Variant sk;
+	Variant sv;
+	DB* db;
+	char key[KSIZE + 1];
 
 	db = db_open(DATAS);
 	start = get_ustime_sec();
-
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < parameters->count; i++) {
 		memset(key, 0, KSIZE + 1);
 
-		request_key(key, r, i);
-
+		/* if you want to test random write, use the following */
+		if (parameters->r)
+			_random_key(key, KSIZE);
+		else
+			snprintf(key, KSIZE, "key-%d", i);
 		fprintf(stderr, "%d searching %s\n", i, key);
 		sk.length = KSIZE;
 		sk.mem = key;
-
-		if (db_get(db, &sk, &sv))
+		ret = db_get(db, &sk, &sv);
+		if (ret) {
+			//db_free_data(sv.mem);
 			found++;
-		else
-			INFO("not found key#%s", sk.mem);
+		} else {
+			INFO("not found key#%s", 
+					sk.mem);
+    	}
 
-		update_op_counter(i, "read");
+		if ((i % 10000) == 0) {
+			fprintf(stderr,"random read finished %d ops%30s\r", 
+					i, 
+					"");
+
+			fflush(stderr);
+		}
 	}
 
-	end = get_ustime_sec();
 	db_close(db);
 
+	end = get_ustime_sec();
 	cost = end - start;
-
 	printf(LINE);
 	printf("|Random-Read	(done:%ld, found:%d): %.6f sec/op; %.1f reads /sec(estimated); cost:%.3f(sec)\n",
-		count, found,
-		(double)(cost / count),
-		(double)(count / cost),
+		parameters->count, found,
+		(double)(cost / parameters->count),
+		(double)(parameters->count / cost),
 		cost);
 }
 
 void _mix_test(long int read_count, long int write_count, int r)
 {
-	printf("Umplimented mix function\n");
+	printf("Umplimented mix function");
 }

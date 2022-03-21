@@ -10,7 +10,7 @@ int function_is_not_supported(char* function) {
 /* Returns 0 if random key is needed, else retuerns 1 */
 int inquire_random_key(int argc) { return (argc == 4); }
 
-void _random_key(char *key, int length) 
+void _random_key(char *key,int length) 
 {
 	int i;
 	char salt[36]= "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -87,28 +87,33 @@ int main(int argc,char** argv)
 		exit(1);
 	}
 
+	Par parameters; 										//HERE
+	pthread_t tid[THREAD_NUM];
+
 	srand(time(NULL));
 
-	// Print Execution Info
 	long int count = atoi(argv[2]);
-	int r = inquire_random_key(argc);
+	parameters.count = atoi(argv[2])/THREAD_NUM;
+	parameters.r = inquire_random_key(argc); 				//HERE
+
 	_print_header(count);
 	_print_environment();
 
-	// Setup for Multithreaded Execution
-	long int workload = count/THREADS_NUM;
-	long int master_load = count%THREADS_NUM;
-	printf("%ld operations per thread (%d threads), master thread will execute %ld operations to complete task\n",
-			workload, THREADS_NUM, master_load);
-
 	if (strcmp(argv[1], "write") == 0)
-		_write_test(count, r);
+		_write_test(count, inquire_random_key(argc));
 
-	else if (strcmp(argv[1], "read") == 0)
-		_read_test(count, r);
+	else if (strcmp(argv[1], "read") == 0){
+		for (int i = 0; i < THREAD_NUM; i++){
+			pthread_create(&tid[i], NULL, (void *)_read_test, (void*) &parameters);
+			//_read_test(parameters.count, inquire_random_key(argc));
+		}
 
+		for (int i = 0; i < THREAD_NUM; i++){
+			pthread_join(tid[i], NULL);
+		}
+	}
 	else
-		_mix_test(count, 0, r);
+		_mix_test(parameters.count, 0, inquire_random_key(argc));
 
 	return 1;
 }
