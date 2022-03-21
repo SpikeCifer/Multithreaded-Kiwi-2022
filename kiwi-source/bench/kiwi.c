@@ -59,7 +59,7 @@ void _write_test(long int count, int r)
 		,cost);	
 }
 
-void _read_test(void* pars)
+void* _read_test(void* pars)
 {
 
 	struct Par *parameters = (struct Par*)pars;
@@ -115,6 +115,7 @@ void _read_test(void* pars)
 		(double)(cost / parameters->count),
 		(double)(parameters->count / cost),
 		cost);
+	return NULL;
 }
 
 void _mix_test(long int read_count, long int write_count, int r)

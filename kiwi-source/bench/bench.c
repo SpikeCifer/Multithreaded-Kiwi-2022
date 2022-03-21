@@ -104,7 +104,7 @@ int main(int argc,char** argv)
 
 	else if (strcmp(argv[1], "read") == 0){
 		for (int i = 0; i < THREAD_NUM; i++){
-			pthread_create(&tid[i], NULL, (void *)_read_test, (void*) &parameters);
+			pthread_create(&tid[i], NULL, _read_test, (void*) &parameters);
 			//_read_test(parameters.count, inquire_random_key(argc));
 		}
 
