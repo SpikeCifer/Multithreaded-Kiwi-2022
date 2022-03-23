@@ -1,14 +1,15 @@
 #include "bench.h"
 
 /* Checks if function is supported/valid. */
-int function_is_not_supported(char* function) {	
+int function_is_not_supported(char* function) 
+{	
 	return (strcmp(function, "read") != 0 && 
 			strcmp(function, "write") != 0 &&
 			strcmp(function, "mix") != 0);
 }
 
 /* Returns 0 if random key is needed, else retuerns 1 */
-int inquire_random_key(int argc) { return (argc == 4); }
+void inquire_random_key(int argc) { random_key_is_required = (argc == 4); }
 
 void _random_key(char *key,int length) 
 {
@@ -78,8 +79,8 @@ void _print_environment()
 				cache_size);
 	}
 }
-
-int main(int argc,char** argv)
+/* Checks command line args and starts clock if all is OK */
+void init_program(int argc, char** argv)
 {
 	// Check that main arguments are valid
 	if (argc < 3 || function_is_not_supported(argv[1])) {
@@ -87,33 +88,41 @@ int main(int argc,char** argv)
 		exit(1);
 	}
 
-	Par parameters; 										//HERE
-	pthread_t tid[THREAD_NUM];
-
 	srand(time(NULL));
+}
 
-	long int count = atoi(argv[2]);
-	parameters.count = atoi(argv[2])/THREAD_NUM;
-	parameters.r = inquire_random_key(argc); 				//HERE
+int main(int argc, char** argv)
+{
+	init_program(argc, argv);
 
-	_print_header(count);
+	pthread_t tid[THREAD_NUM];
+	long int total_count = atoi(argv[2]);
+
+	inquire_random_key(argc); 
+
+	_print_header(total_count);
 	_print_environment();
 
 	if (strcmp(argv[1], "write") == 0)
-		_write_test(count, inquire_random_key(argc));
+		_write_test(total_count);
 
-	else if (strcmp(argv[1], "read") == 0){
-		for (int i = 0; i < THREAD_NUM; i++){
-			pthread_create(&tid[i], NULL, _read_test, (void*) &parameters);
-			//_read_test(parameters.count, inquire_random_key(argc));
+	else if (strcmp(argv[1], "read") == 0) {
+
+		for (int i = 0; i < THREAD_NUM; i++) {
+			Thread_info *thread_p = malloc(sizeof(Thread_info));
+			thread_p->id = i;
+			thread_p->load = total_count/THREAD_NUM;
+			pthread_create(&tid[i], NULL, _read_test, (void*) thread_p);
 		}
-
-		for (int i = 0; i < THREAD_NUM; i++){
+			
+		for (int i = 0; i < THREAD_NUM; i++) {
 			pthread_join(tid[i], NULL);
 		}
+			
 	}
+	
 	else
-		_mix_test(parameters.count, 0, inquire_random_key(argc));
+		_mix_test(total_count, 0);
 
 	return 1;
 }

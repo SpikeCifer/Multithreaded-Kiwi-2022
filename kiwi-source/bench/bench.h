@@ -9,19 +9,21 @@
 
 #define KSIZE (16)
 #define VSIZE (1000)
-#define THREAD_NUM (100) //HERE
+#define THREAD_NUM (100)
 
 #define LINE "+-----------------------------+----------------+------------------------------+-------------------+\n"
 #define LINE1 "---------------------------------------------------------------------------------------------------\n"
 
-typedef struct Par{
-    long int count; //HERE
-    int r;
-}Par;
+int random_key_is_required;
+
+typedef struct thread_info{
+    int id;
+    long int load;
+}Thread_info;
 
 long long get_ustime_sec(void);
 void _random_key(char *key,int length);
 
-void _write_test(long int count, int r);
+void _write_test(long int count);
 void* _read_test(void *pars);
-void _mix_test(long int read_count, long int write_count, int r);
+void _mix_test(long int read_count, long int write_count);
