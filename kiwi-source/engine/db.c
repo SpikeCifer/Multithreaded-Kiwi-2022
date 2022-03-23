@@ -5,6 +5,8 @@
 #include "utils.h"
 #include "log.h"
 
+int thread_counter = 0;
+
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
     DB* self = calloc(1, sizeof(DB));
@@ -23,11 +25,26 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
 
 DB* db_open(const char* basedir)
 {
-    return db_open_ex(basedir, LRU_CACHE_SIZE);
+    pthread_mutex_lock(&thread_counter_lock);
+    thread_counter++; 
+    
+    if (thread_counter == 1)
+        database = db_open_ex(basedir, LRU_CACHE_SIZE);
+
+    pthread_mutex_unlock(&thread_counter_lock);
+    return database;   
 }
 
 void db_close(DB *self)
 {
+    pthread_mutex_lock(&thread_counter_lock);
+    thread_counter--;
+    if (thread_counter > 0){
+        pthread_mutex_unlock(&thread_counter_lock);
+        return;
+    }
+
+    pthread_mutex_unlock(&thread_counter_lock);
     INFO("Closing database %d", self->memtable->add_count);
 
     if (self->memtable->list->count > 0)

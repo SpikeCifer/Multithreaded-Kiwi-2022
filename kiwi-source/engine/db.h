@@ -6,6 +6,7 @@
 #include "variant.h"
 #include "memtable.h"
 #include "merger.h"
+#include <pthread.h>
 
 typedef struct _db {
 //    char basedir[MAX_FILENAME];
@@ -13,6 +14,11 @@ typedef struct _db {
     SST* sst;
     MemTable* memtable;
 } DB;
+
+static pthread_mutex_t thread_counter_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static DB* database;
+extern int thread_counter;
 
 DB* db_open(const char *basedir);
 DB* db_open_ex(const char *basedir, uint64_t cache_size);

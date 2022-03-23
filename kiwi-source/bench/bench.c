@@ -8,7 +8,7 @@ int function_is_not_supported(char* function)
 			strcmp(function, "mix") != 0);
 }
 
-/* Returns 0 if random key is needed, else retuerns 1 */
+/* Returns 0 if random key is needed, else returns 1 */
 void inquire_random_key(int argc) { random_key_is_required = (argc == 4); }
 
 void _random_key(char *key,int length) 
@@ -91,12 +91,31 @@ void init_program(int argc, char** argv)
 	srand(time(NULL));
 }
 
+void print_results(double cost, int found, int total_count)
+{
+	printf(LINE);
+	printf("|Random-Read	(done:%d, found:%d): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
+		total_count, found,
+		(double)(cost / total_count),
+		(double)(total_count / cost),
+		(double)cost);
+}
+
 int main(int argc, char** argv)
 {
+	double total_cost = 0.0;
+	int total_found = 0;
+
 	init_program(argc, argv);
 
-	pthread_t tid[THREAD_NUM];
+	int thread_num = MAX_THREAD_NUM;
+	Thread_results *thread_results;
+
+	pthread_t tid[MAX_THREAD_NUM];
 	long int total_count = atoi(argv[2]);
+
+	if (total_count < MAX_THREAD_NUM)	// Use when number of requests is less than MAX_THREAD_NUM
+		thread_num = total_count; 		// Set number of threads equal to the user's request;
 
 	inquire_random_key(argc); 
 
@@ -108,17 +127,21 @@ int main(int argc, char** argv)
 
 	else if (strcmp(argv[1], "read") == 0) {
 
-		for (int i = 0; i < THREAD_NUM; i++) {
+		for (int i = 0; i < thread_num; i++) {
 			Thread_info *thread_p = malloc(sizeof(Thread_info));
 			thread_p->id = i;
-			thread_p->load = total_count/THREAD_NUM;
+			thread_p->load = total_count/thread_num;
 			pthread_create(&tid[i], NULL, _read_test, (void*) thread_p);
 		}
 			
-		for (int i = 0; i < THREAD_NUM; i++) {
-			pthread_join(tid[i], NULL);
+		for (int i = 0; i < thread_num; i++) {
+			pthread_join(tid[i],(void *) &thread_results);
+			total_cost = (double)thread_results->cost;
+			total_found += thread_results->found;
 		}
-			
+
+		print_results(total_cost, total_found, total_count);
+		printf("cost: %.3f", total_cost);
 	}
 	
 	else

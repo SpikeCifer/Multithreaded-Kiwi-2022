@@ -9,7 +9,7 @@
 
 #define KSIZE (16)
 #define VSIZE (1000)
-#define THREAD_NUM (100)
+#define MAX_THREAD_NUM (1000)
 
 #define LINE "+-----------------------------+----------------+------------------------------+-------------------+\n"
 #define LINE1 "---------------------------------------------------------------------------------------------------\n"
@@ -20,6 +20,11 @@ typedef struct thread_info{
     int id;
     long int load;
 }Thread_info;
+
+typedef struct thread_results{
+    double cost;
+    int found;
+}Thread_results;
 
 long long get_ustime_sec(void);
 void _random_key(char *key,int length);

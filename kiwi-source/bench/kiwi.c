@@ -76,6 +76,7 @@ void _write_test(long int load)
 void* _read_test(void* thread_p)
 {
 	Thread_info *parameters = (Thread_info*) thread_p;
+	Thread_results *thread_res = (Thread_results *)malloc(sizeof(Thread_results));
 
 	int ret;
 	int found = 0;
@@ -111,24 +112,21 @@ void* _read_test(void* thread_p)
 
 		update_op_counter(i, "read");
 	}
-
+	
+	end = get_ustime_sec();
 	db_close(db);
 
-	end = get_ustime_sec();
+	
 	cost = end - start;
 
-	printf(LINE);
-	printf("|Random-Read	(done:%ld, found:%d): %.6f sec/op; %.1f reads /sec(estimated); cost:%.3f(sec)\n",
-		parameters->load, found,
-		(double)(cost / parameters->load),
-		(double)(parameters->load / cost),
-		cost);
+	thread_res->cost = cost;
+	thread_res->found = found;
 
 	free(thread_p);
-	return NULL;
+	return thread_res;
 }
 
 void _mix_test(long int read_count, long int write_count)
 {
-	printf("Umplimented mix function");
+	printf("Unimplimented mix function");
 }

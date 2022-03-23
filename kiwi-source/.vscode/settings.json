@@ -1,0 +1,5 @@
+{
+    "files.associations": {
+        "memtable.h": "c"
+    }
+}
