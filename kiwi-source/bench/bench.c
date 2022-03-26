@@ -105,7 +105,7 @@ int main(int argc, char** argv)
 {
 	double total_cost = 0.0;
 	int total_found = 0;
-
+	void* db_pointer = open_database(); // Open the database and return a void pointer to it. It will be cast later to DB*
 	init_program(argc, argv);
 
 	int thread_num = MAX_THREAD_NUM;
@@ -122,15 +122,38 @@ int main(int argc, char** argv)
 	_print_header(total_count);
 	_print_environment();
 
-	if (strcmp(argv[1], "write") == 0)
-		_write_test(total_count);
+	if (strcmp(argv[1], "write") == 0){
+		for(int i=0; i < thread_num; i++){
+			Thread_info *thread_p = malloc(sizeof(Thread_info));
+			thread_p->id = i;
+			thread_p->load = total_count/thread_num;
+			thread_p->db_p = db_pointer;
+			pthread_create(&tid[i], NULL, _write_test, (void*) thread_p);
+		}
+		for (int i = 0; i < thread_num; i++) {
+			pthread_join(tid[i],(void *) &thread_results);
+			total_cost = (double)thread_results->cost;
+		}
+		close_database();
+		
+
+		// Show Results
+		printf(LINE);
+		printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost:%.3f(sec);\n",
+			total_count, (double)(total_cost / total_count),
+			(double)(total_count / total_cost) ,total_cost);
+	}
+		//_write_test(total_count);
 
 	else if (strcmp(argv[1], "read") == 0) {
+		
+		
 
 		for (int i = 0; i < thread_num; i++) {
 			Thread_info *thread_p = malloc(sizeof(Thread_info));
 			thread_p->id = i;
 			thread_p->load = total_count/thread_num;
+			thread_p->db_p = db_pointer;
 			pthread_create(&tid[i], NULL, _read_test, (void*) thread_p);
 		}
 			
@@ -139,6 +162,7 @@ int main(int argc, char** argv)
 			total_cost = (double)thread_results->cost;
 			total_found += thread_results->found;
 		}
+		close_database();
 
 		print_results(total_cost, total_found, total_count);
 		printf("cost: %.3f", total_cost);
@@ -146,6 +170,5 @@ int main(int argc, char** argv)
 	
 	else
 		_mix_test(total_count, 0);
-
 	return 1;
 }

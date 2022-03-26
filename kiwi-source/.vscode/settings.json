@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "memtable.h": "c"
-    }
+        "memtable.h": "c",
+        "stdlib.h": "c"
+    },
+    "C_Cpp.errorSquiggles": "Disabled"
 }

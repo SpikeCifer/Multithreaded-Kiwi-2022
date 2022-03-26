@@ -15,7 +15,7 @@ typedef struct _db {
     MemTable* memtable;
 } DB;
 
-static pthread_mutex_t thread_counter_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t thread_wr_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static DB* database;
 extern int thread_counter;

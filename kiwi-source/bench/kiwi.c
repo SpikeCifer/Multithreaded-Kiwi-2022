@@ -24,13 +24,14 @@ void request_random_key(char *key, int i)
 			snprintf(key, KSIZE, "key-%d", i);
 }
 
-void _write_test(long int load)
+void* _write_test(void* thread_w)
 {
-	int i;
+	Thread_info *thread_par = (Thread_info*) thread_w;
+	Thread_results *thread_res = (Thread_results *)malloc(sizeof(Thread_results));
+	
 	double cost;
 	long long start,end;
 	Variant sk, sv;
-	DB* db;
 
 	char key[KSIZE + 1];
 	char val[VSIZE + 1];
@@ -40,11 +41,12 @@ void _write_test(long int load)
 	memset(val, 0, VSIZE + 1);
 	memset(sbuf, 0, 1024);
 
-	db = db_open(DATAS);
+	long int offset = thread_par->id*thread_par->load;
+
 	start = get_ustime_sec();
 
 	// Use DB
-	for (i = 0; i < load; i++) {
+	for (int i = offset; i < offset + thread_par->load; i++) {
 
 		request_random_key(key, i);
 
@@ -56,26 +58,22 @@ void _write_test(long int load)
 		sv.length = VSIZE;
 		sv.mem = val;
 
-		db_add(db, &sk, &sv);
+		db_add(thread_par->db_p, &sk, &sv);
 		update_op_counter(i, "write");
 	}
-
-	db_close(db);
 
 	// Calculate Cost
 	end = get_ustime_sec();
 	cost = end - start;
-
-	// Show Results
-	printf(LINE);
-	printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost:%.3f(sec);\n",
-			load, (double)(cost / load),
-			(double)(load / cost) ,cost);	
+	
+	thread_res->cost = cost;
+	free(thread_w);
+	return thread_res;
 }
 
-void* _read_test(void* thread_p)
+void* _read_test(void* thread_r)
 {
-	Thread_info *parameters = (Thread_info*) thread_p;
+	Thread_info *parameters = (Thread_info*) thread_r;
 	Thread_results *thread_res = (Thread_results *)malloc(sizeof(Thread_results));
 
 	int ret;
@@ -84,12 +82,11 @@ void* _read_test(void* thread_p)
 	long long start,end;
 	Variant sk;
 	Variant sv;
-	DB* db;
+
 	char key[KSIZE + 1];
 
 	long int offset = parameters->id*parameters->load;
 
-	db = db_open(DATAS);
 	start = get_ustime_sec();
 	
 	// Use the DB
@@ -101,7 +98,7 @@ void* _read_test(void* thread_p)
 		fprintf(stderr, "%d searching %s\n", i, key);
 		sk.length = KSIZE;
 		sk.mem = key;
-		ret = db_get(db, &sk, &sv);
+		ret = db_get((DB*)parameters->db_p, &sk, &sv);
 
 		if (ret) {
 			found++;
@@ -109,24 +106,29 @@ void* _read_test(void* thread_p)
 			INFO("not found key#%s", 
 					sk.mem);
     	}
-
 		update_op_counter(i, "read");
 	}
 	
 	end = get_ustime_sec();
-	db_close(db);
-
 	
 	cost = end - start;
-
 	thread_res->cost = cost;
 	thread_res->found = found;
 
-	free(thread_p);
+	free(thread_r);
 	return thread_res;
+}
+
+void* open_database(){
+	database = db_open(DATAS);
+	return database;
+}
+void close_database(){
+	db_close(database);
 }
 
 void _mix_test(long int read_count, long int write_count)
 {
+
 	printf("Unimplimented mix function");
 }
