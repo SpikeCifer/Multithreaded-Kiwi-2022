@@ -9,7 +9,6 @@
 #include <pthread.h>
 
 typedef struct _db {
-//    char basedir[MAX_FILENAME];
     char basedir[MAX_FILENAME+1];
     SST* sst;
     MemTable* memtable;

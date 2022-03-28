@@ -19,7 +19,6 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
 
     Log* log = log_new(self->sst->basedir);
     self->memtable = memtable_new(log);
-
     return self;
 }
 

@@ -30,7 +30,7 @@ void* _write_test(void* thread_w)
 	Thread_results *thread_res = (Thread_results *)malloc(sizeof(Thread_results));
 	
 	double cost;
-	long long start,end;
+	long long start, end;
 	Variant sk, sv;
 
 	char key[KSIZE + 1];
@@ -123,8 +123,10 @@ void* open_database(){
 	database = db_open(DATAS);
 	return database;
 }
+
 void close_database(){
 	db_close(database);
+	return;
 }
 
 void _mix_test(long int read_count, long int write_count)
