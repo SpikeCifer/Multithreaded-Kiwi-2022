@@ -93,20 +93,11 @@ void init_program(int argc, char** argv)
 	_print_header(atoi(argv[2]));
 	_print_environment();
 
-	inquire_random_key(argc); // Flag defines whether program should gen random keys or not
+	inquire_random_key(argc);
 }
 
-void print_results(double cost, int found, int total_count)
+long int get_threads_num(long int requests_num) 
 {
-	printf(LINE);
-	printf("|Random-Read	(done:%d, found:%d): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
-		total_count, found,
-		(double)(cost / total_count),
-		(double)(total_count / cost),
-		(double)cost);
-}
-
-long int get_threads_num(long int requests_num) {
 	if (requests_num < MAX_THREAD_NUM)	// Use when number of requests is less than MAX_THREAD_NUM
 		return requests_num; 		// Set number of threads equal to the user's request;
 
@@ -115,9 +106,6 @@ long int get_threads_num(long int requests_num) {
 
 void write_requests(const int thread_num, const long int requests_num, void* db_pointer)
 {
-	Thread_results *thread_results;
-	double total_cost = 0.0;
-
 	pthread_t thread_ids[thread_num];
 
 	// Create Threads
@@ -132,34 +120,34 @@ void write_requests(const int thread_num, const long int requests_num, void* db_
 	}
 
 	// Terminate Threads
-	for (int i = 0; i < thread_num; i++) {
-		pthread_join(thread_ids[i], (void *) &thread_results);
-		total_cost = (long long) thread_results->cost;
-	}
+	for (int i = 0; i < thread_num; i++)
+		pthread_join(thread_ids[i], NULL);
 }
 
 long int read_requests(const int thread_num, const long requests_num, void* db_pointer)
 {
-	Thread_results *thread_results;
 	pthread_t thread_ids[thread_num];
 
-	double total_cost = 0.0;
 	long int total_found = 0;
 
 	// Create Threads
 	for (int i = 0; i < thread_num; i++) {
 		Thread_info *thread_p = malloc(sizeof(Thread_info));
+
 		thread_p->id = i;
 		thread_p->load = requests_num/thread_num;
 		thread_p->db_p = db_pointer;
+
 		pthread_create(&thread_ids[i], NULL, _read_test, (void*) thread_p);
 	}
 
 	// Terminate Threads	
 	for (int i = 0; i < thread_num; i++) {
-		pthread_join(thread_ids[i],(void *) &thread_results);
-		total_cost = (double)thread_results->cost;
-		total_found += thread_results->found;
+		int* res;
+
+		pthread_join(thread_ids[i], (void *) &res);
+		
+		total_found += *res;
 	}
 
 	return total_found;
@@ -172,32 +160,38 @@ int main(int argc, char** argv)
 	long int total_count = atoi(argv[2]);
 	long int thread_num = get_threads_num(total_count);
 
-	if (strcmp(argv[1], "write") == 0)
-	{
-		void* db_pointer = open_database(); // Open the database and return a void pointer to it. It will be cast later to DB*
-		
+	void* db_pointer = open_database(); // It will be cast later to DB*
+
+	if (strcmp(argv[1], "write") == 0) {
+
+		// Time Execution
 		long long start_time = get_ustime_sec();
+
 		write_requests(thread_num, total_count, db_pointer);
+
 		double total_cost = get_ustime_sec() - start_time;
 
-		close_database();
+		db_close(db_pointer);
 
 		// Print Results
 		printf(LINE);
-		printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.3f(sec);\n",
+		printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec);\n",
 			total_count, (double)(total_cost/total_count),
 			(double) (total_count/total_cost), total_cost);
 	}
 		
 	else if (strcmp(argv[1], "read") == 0) {
-		void* db_pointer = open_database();
 
+		// Time Execution
 		long long start_time = get_ustime_sec();
+
 		long int total_found = read_requests(thread_num, total_count, db_pointer);
+
 		double total_cost = get_ustime_sec() - start_time;
 
-		close_database();
+		db_close(db_pointer);
 
+		// Print Results
 		printf(LINE);
 		printf("|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
 			total_count, total_found,
@@ -208,7 +202,6 @@ int main(int argc, char** argv)
 	
 	else
 		_mix_test(total_count, 0);
-
 
 	return 1;
 }

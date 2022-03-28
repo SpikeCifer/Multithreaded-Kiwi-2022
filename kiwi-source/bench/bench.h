@@ -9,12 +9,12 @@
 
 #define KSIZE (16)
 #define VSIZE (1000)
-#define MAX_THREAD_NUM (100)
+#define MAX_THREAD_NUM (10)
 
 #define LINE "+-----------------------------+----------------+------------------------------+-------------------+\n"
 #define LINE1 "---------------------------------------------------------------------------------------------------\n"
 
-int random_key_is_required;
+int random_key_is_required; // Flag defines whether program should gen random keys or not
 
 typedef struct thread_info{
     int id;
@@ -33,5 +33,5 @@ void _random_key(char *key,int length);
 void* _write_test(void *thread_w);
 void* _read_test(void *thread_r);
 void _mix_test(long int read_count, long int write_count);
+
 void* open_database();
-void close_database();
