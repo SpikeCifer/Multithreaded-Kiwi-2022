@@ -90,8 +90,6 @@ static int _memtable_edit(MemTable* self, const Variant* key, const Variant* val
     else
         self->del_count++;
 
-//    DEBUG("memtable_edit: %.*s %.*s opt: %d", key->length, key->mem, value->length, value->mem, opt);
-
     return 1;
 }
 

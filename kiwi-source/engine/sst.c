@@ -115,14 +115,14 @@ static void _schedule_compaction(SST* self)
 
     if (self->comp_score >= 1)
     {
-#ifndef BACKGROUND_MERGE
-        sst_compact(self);
-#else
-        pthread_mutex_lock(&self->cv_lock);
-        self->merge_state |= MERGE_STATUS_COMPACT;
-        pthread_cond_signal(&self->cv);
-        pthread_mutex_unlock(&self->cv_lock);
-#endif
+        #ifndef BACKGROUND_MERGE
+                sst_compact(self);
+        #else
+                pthread_mutex_lock(&self->cv_lock);
+                self->merge_state |= MERGE_STATUS_COMPACT;
+                pthread_cond_signal(&self->cv);
+                pthread_mutex_unlock(&self->cv_lock);
+        #endif
     }
 }
 
@@ -391,18 +391,18 @@ SST* sst_new(const char* basedir, uint64_t cache_size)
         self->num_files[i] = 0;
     }
 
-#ifdef BACKGROUND_MERGE
-    self->merge_state = 0;
-    self->immutable = NULL;
-    self->immutable_list = NULL;
+    #ifdef BACKGROUND_MERGE
+        self->merge_state = 0;
+        self->immutable = NULL;
+        self->immutable_list = NULL;
 
-    pthread_mutex_init(&self->lock, NULL);
-    pthread_mutex_init(&self->cv_lock, NULL);
-    pthread_mutex_init(&self->immutable_lock, NULL);
-    pthread_cond_init(&self->cv, NULL);
+        pthread_mutex_init(&self->lock, NULL);
+        pthread_mutex_init(&self->cv_lock, NULL);
+        pthread_mutex_init(&self->immutable_lock, NULL);
+        pthread_cond_init(&self->cv, NULL);
 
-    pthread_create(&self->merge_thread, NULL, (void *(*)(void *))merge_thread, self);
-#endif
+        pthread_create(&self->merge_thread, NULL, (void *(*)(void *))merge_thread, self);
+    #endif
 
     _read_manifest(self);
 
@@ -411,17 +411,17 @@ SST* sst_new(const char* basedir, uint64_t cache_size)
 
 void sst_free(SST* self)
 {
-#ifdef BACKGROUND_MERGE
-    INFO("Sending termination message to the detached thread");
+    #ifdef BACKGROUND_MERGE
+        INFO("Sending termination message to the detached thread");
 
-    pthread_mutex_lock(&self->cv_lock);
-    self->merge_state |= MERGE_STATUS_EXIT;
-    pthread_cond_signal(&self->cv);
-    pthread_mutex_unlock(&self->cv_lock);
+        pthread_mutex_lock(&self->cv_lock);
+        self->merge_state |= MERGE_STATUS_EXIT;
+        pthread_cond_signal(&self->cv);
+        pthread_mutex_unlock(&self->cv_lock);
 
-    INFO("Waiting the merger thread");
-    pthread_join(self->merge_thread, NULL);
-#endif
+        INFO("Waiting the merger thread");
+        pthread_join(self->merge_thread, NULL);
+    #endif
 
     _write_manifest(self);
 
@@ -503,9 +503,9 @@ void sst_file_add(SST* self, SSTMetadata* meta)
     _write_manifest(self);
 
     _sort_files(self);
-#ifndef BACKGROUND_MERGE
-    _schedule_compaction(self);
-#endif
+    #ifndef BACKGROUND_MERGE
+        _schedule_compaction(self);
+    #endif
 }
 
 File* sst_filename_new(SST* self, uint32_t level, uint32_t filenum)
@@ -651,89 +651,75 @@ void sst_merge_real(SST* self, SkipList* list)
 
 int sst_get(SST* self, Variant* key, Variant* value)
 {
-#ifdef BACKGROUND_MERGE
-    int ret = 0;
+    #ifdef BACKGROUND_MERGE
+        int ret = 0;
 
-    pthread_mutex_lock(&self->cv_lock);
-    if (self->immutable)
-    {
-        DEBUG("Serving sst_get request from immutable memtable");
-        ret = memtable_get(self->immutable_list, key, value);
-    }
-    pthread_mutex_unlock(&self->cv_lock);
+        pthread_mutex_lock(&self->cv_lock);
+        if (self->immutable)
+        {
+            DEBUG("Serving sst_get request from immutable memtable");
+            ret = memtable_get(self->immutable_list, key, value);
+        }
+        pthread_mutex_lock(&self->lock); // Gather all locks before starting unlocking process (2PL)
 
-    if (ret)
-        return ret;
+        pthread_mutex_unlock(&self->cv_lock);
 
-    pthread_mutex_lock(&self->lock);
-#endif
+        if (ret)
+            return ret;
+    #endif
 
     vector_clear(self->targets);
 
+    // Search SSTable's Levels
     for (int level = 0; level < MAX_LEVELS; level++)
     {
-        if (self->num_files[level] == 0)
+        if (self->num_files[level] == 0) // Level has no entries
             continue;
 
-        if (level == 0)
-        {
-            for (uint32_t i = 0; i < self->num_files[level]; i++)
-            {
-//                INFO("Compare %.*s %.*s = %d", key->length, key->mem, self->files[level][i]->smallest_key->length, self->files[level][i]->smallest_key->mem, variant_cmp(key, self->files[level][i]->smallest_key));
-//                INFO("Compare %.*s %.*s = %d", key->length, key->mem, self->files[level][i]->largest_key->length, self->files[level][i]->largest_key->mem, variant_cmp(key, self->files[level][i]->largest_key));
-
+        if (level == 0) {
+            for (uint32_t i = 0; i < self->num_files[level]; i++) {
                 if (variant_cmp(key, self->files[level][i]->smallest_key) >= 0 &&
                     variant_cmp(key, self->files[level][i]->largest_key) <= 0)
                 {
-//                    INFO("ADDING IT");
                     vector_add(self->targets, self->files[level][i]);
                 }
             }
 
-            qsort(vector_data(self->targets),
-                  vector_count(self->targets),
+            qsort(vector_data(self->targets), vector_count(self->targets),
                   sizeof(SSTMetadata**), (int(*)(const void*, const void*))_compare_by_latest);
         }
-        else
-        {
+
+        else {
             uint32_t start = sst_find_file(self, level, key);
 
             if (start >= self->num_files[level] ||
                 variant_cmp(key, self->files[level][start]->smallest_key) < 0)
                 continue;
 
-//            DEBUG("Adding possible target %s", self->files[level][start]->loader->file->filename);
-
             vector_add(self->targets, self->files[level][start]);
         }
     }
 
-
-    for (uint32_t i = 0; i < vector_count(self->targets); i++)
-    {
-//        DEBUG("Looking for key %.*s inside %s", key->length, key->mem, ((SSTMetadata*)vector_get(self->targets, i))->loader->file->filename);
+    for (uint32_t i = 0; i < vector_count(self->targets); i++) {
         OPT opt;
         SSTMetadata* target = (SSTMetadata *)vector_get(self->targets, i);
 
-        if (--target->allowed_seeks <= 0)
-        {
+        if (--target->allowed_seeks <= 0) {
             _schedule_compaction(self);
             target->allowed_seeks = target->filesize / 16384;
         }
 
-        if (sst_loader_get(target->loader, key, value, &opt) == 1)
-        {
-#ifdef BACKGROUND_MERGE
-            pthread_mutex_unlock(&self->lock);
-#endif
-
+        if (sst_loader_get(target->loader, key, value, &opt) == 1) {
+            #ifdef BACKGROUND_MERGE
+                pthread_mutex_unlock(&self->lock);
+            #endif
             return opt == ADD;
         }
     }
 
-#ifdef BACKGROUND_MERGE
-    pthread_mutex_unlock(&self->lock);
-#endif
+    #ifdef BACKGROUND_MERGE
+        pthread_mutex_unlock(&self->lock);
+    #endif
 
     return 0;
 }

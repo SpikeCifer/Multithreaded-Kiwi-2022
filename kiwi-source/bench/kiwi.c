@@ -64,7 +64,8 @@ void* _write_test(void* thread_w)
 void* _read_test(void* thread_r)
 {
 	Thread_info *parameters = (Thread_info*) thread_r;
-
+	
+	int* result = (int *)malloc(sizeof(int));
 	int found = 0;
 
 	Variant sk;
@@ -94,12 +95,12 @@ void* _read_test(void* thread_r)
 	}
 
 	free(thread_r);
-	int* result = (int *)malloc(sizeof(int));
 	*result = found;
 	return (void *) result;
 }
 
-void* open_database(){
+void* open_database()
+{
 	database = db_open(DATAS);
 	return database;
 }
