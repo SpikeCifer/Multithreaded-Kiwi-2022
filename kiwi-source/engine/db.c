@@ -6,17 +6,23 @@
 #include "log.h"
 
 int thread_counter = 0;
+int readers_count = 0;
+int writers_count = 0;
 
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
     DB* self = calloc(1, sizeof(DB));
-
     if (!self)
         PANIC("NULL allocation");
 
     strncpy(self->basedir, basedir, MAX_FILENAME);
     self->sst = sst_new(basedir, cache_size);
 
+    pthread_mutex_init(&self->wr_lock, NULL);
+    pthread_mutex_init(&self->rd_lock, NULL);
+    pthread_cond_init(&self->no_readers_cond, NULL);
+    self->reader_count = 0;
+    
     Log* log = log_new(self->sst->basedir);
     self->memtable = memtable_new(log);
     return self;
@@ -43,31 +49,54 @@ void db_close(DB *self)
     log_free(self->memtable->log);
     memtable_free(self->memtable);
     free(self);
+    pthread_cond_destroy(&self->no_readers_cond);
+    pthread_mutex_destroy(&self->wr_lock);
 }
 
 int db_add(DB* self, Variant* key, Variant* value)
 {
-    pthread_mutex_lock(&thread_wr_lock);
+    pthread_mutex_lock(&self->wr_lock);
+    while (self->reader_count > 0)
+    {
+        pthread_cond_wait(&self->no_readers_cond, &self->wr_lock);
+    }
+    
     if (memtable_needs_compaction(self->memtable))
-    {      
-        //pthread_cond_wait(&self->sst->cv, &self->sst->cv_lock);
+    {   
         INFO("Starting compaction of the memtable after %d insertions and %d deletions",
              self->memtable->add_count, self->memtable->del_count);
         sst_merge(self->sst, self->memtable);
         memtable_reset(self->memtable);
     }
     int add_res = memtable_add(self->memtable, key, value);
-    pthread_mutex_unlock(&thread_wr_lock);
+    
+    pthread_mutex_unlock(&self->wr_lock);
     
     return add_res;
 }
 
 int db_get(DB* self, Variant* key, Variant* value)
 {
+    int get_res;
+    pthread_mutex_lock(&self->wr_lock);
+    self->reader_count++;
+    pthread_mutex_unlock(&self->wr_lock);
+    
     if (memtable_get(self->memtable->list, key, value)) // If found in memtable return
-        return 1;
-
-    return sst_get(self->sst, key, value);
+        get_res = 1;
+    else
+        get_res = sst_get(self->sst, key, value);
+    
+    pthread_mutex_lock(&self->wr_lock);
+    self->reader_count--;
+    
+    if (self->reader_count == 0)
+    {
+        pthread_cond_signal(&self->no_readers_cond);
+    }
+    pthread_mutex_unlock(&self->wr_lock);
+   
+    return get_res;
 }
 
 int db_remove(DB* self, Variant* key)

@@ -5,11 +5,12 @@ int function_is_not_supported(char* function)
 {	
 	return (strcmp(function, "read") != 0 && 
 			strcmp(function, "write") != 0 &&
-			strcmp(function, "mix") != 0);
+			strcmp(function, "mix") != 0 && 
+			strcmp(function, "readwrite") != 0);
 }
 
 /* Returns 0 if random key is needed, else returns 1 */
-void inquire_random_key(int argc) { random_key_is_required = (argc == 4); }
+void inquire_random_key(int argc) { random_key_is_required = (argc == 5); }
 
 void _random_key(char *key,int length) 
 {
@@ -83,7 +84,7 @@ void _print_environment()
 void init_program(int argc, char** argv)
 {
 	// Check that main arguments are valid
-	if (argc < 3 || function_is_not_supported(argv[1])) {
+	if (argc < 4 || function_is_not_supported(argv[1])) {
 		fprintf(stderr,"Usage: db-bench <write | read> <count> (key)\n");
 		exit(1);
 	}	
@@ -96,12 +97,12 @@ void init_program(int argc, char** argv)
 	inquire_random_key(argc);
 }
 
-long int get_threads_num(long int requests_num) 
+long int get_threads_num(long int requests_num, int thread_count) 
 {
-	if (requests_num < MAX_THREAD_NUM)	// Use when number of requests is less than MAX_THREAD_NUM
+	if (requests_num < thread_count)	// Use when number of requests is less than MAX_THREAD_NUM
 		return requests_num; 		// Set number of threads equal to the user's request;
 
-	return MAX_THREAD_NUM;
+	return thread_count;
 }
 
 void write_requests(const int thread_num, const long int requests_num, void* db_pointer)
@@ -157,8 +158,9 @@ int main(int argc, char** argv)
 {
 	init_program(argc, argv);
 
+	int thread_input_count = atoi(argv[3]);
 	long int total_count = atoi(argv[2]);
-	long int thread_num = get_threads_num(total_count);
+	long int thread_num = get_threads_num(total_count, thread_input_count);
 
 	void* db_pointer = open_database(); // It will be cast later to DB*
 
@@ -200,8 +202,70 @@ int main(int argc, char** argv)
 			(double) total_cost);
 	}
 	
-	else
-		_mix_test(total_count, 0);
+	else if (strcmp(argv[1], "readwrite") == 0) {
+		
+		int count = atoi(argv[2]);
+		int reader_count = count / 2; // 50-50 readers/writers requests (default)
+		int writer_count = count - reader_count;
+
+		int thread_count = atoi(argv[3]);
+		int thr_rd_count = thread_count / 2; // 50-50 readers/writers (default)
+		int thr_wr_count = thread_count - thr_rd_count;
+
+		long int total_found = 0;
+
+		pthread_t reader_ids[thr_rd_count];
+		pthread_t writer_ids[thr_wr_count];
+
+		long long start_time = get_ustime_sec();
+
+		//Create Writers --------------------------------------
+		for (int i = 0; i < thr_wr_count; i++) {
+			Thread_info *writer_p = malloc(sizeof(Thread_info));
+
+			writer_p->id = i;
+			writer_p->load = writer_count/thr_wr_count;
+			writer_p->db_p = db_pointer;
+
+			pthread_create(&writer_ids[i], NULL, _write_test, (void *) writer_p);
+		}
+		//Create readers --------------------------------------
+		for (int i = 0; i < thr_rd_count; i++) {
+			Thread_info *reader_p = malloc(sizeof(Thread_info));
+
+			reader_p->id = i;
+			reader_p->load = reader_count/thr_rd_count;
+			reader_p->db_p = db_pointer;
+
+			pthread_create(&reader_ids[i], NULL, _read_test, (void*) reader_p);
+		}
+
+		//Join writers
+		for (int i = 0; i < thr_wr_count; i++)
+			pthread_join(writer_ids[i], NULL);
+		//Join readers
+		for (int i = 0; i < thr_rd_count; i++) {
+			int* res;
+
+			pthread_join(reader_ids[i], (void *) &res);
+			
+			total_found += *res;
+		}
+		db_close(db_pointer);
+		
+		double total_cost = get_ustime_sec() - start_time;
+
+		printf(LINE);
+		printf("|Random-Read	(done:%d, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
+			reader_count, total_found,
+			(double) (total_cost / reader_count),
+			(double) (reader_count / total_cost),
+			(double) total_cost);
+		
+		
+	}
+	
+		
 
 	return 1;
 }

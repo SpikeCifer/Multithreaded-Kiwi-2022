@@ -12,12 +12,14 @@ typedef struct _db {
     char basedir[MAX_FILENAME+1];
     SST* sst;
     MemTable* memtable;
+    
+    pthread_mutex_t wr_lock;
+    pthread_mutex_t rd_lock;
+    pthread_cond_t no_readers_cond;
+    int reader_count;
 } DB;
 
-static pthread_mutex_t thread_wr_lock = PTHREAD_MUTEX_INITIALIZER;
-
 static DB* database;
-extern int thread_counter;
 
 DB* db_open(const char *basedir);
 DB* db_open_ex(const char *basedir, uint64_t cache_size);
