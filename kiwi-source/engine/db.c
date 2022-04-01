@@ -48,19 +48,17 @@ void db_close(DB *self)
     log_remove(self->memtable->log, self->memtable->lsn);
     log_free(self->memtable->log);
     memtable_free(self->memtable);
+
     free(self);
     pthread_cond_destroy(&self->no_readers_cond);
     pthread_mutex_destroy(&self->wr_lock);
 }
 
+// TODO Add Write Lock/Unlock
 int db_add(DB* self, Variant* key, Variant* value)
 {
     pthread_mutex_lock(&self->wr_lock);
-    while (self->reader_count > 0)
-    {
-        pthread_cond_wait(&self->no_readers_cond, &self->wr_lock);
-    }
-    
+
     if (memtable_needs_compaction(self->memtable))
     {   
         INFO("Starting compaction of the memtable after %d insertions and %d deletions",
@@ -75,28 +73,13 @@ int db_add(DB* self, Variant* key, Variant* value)
     return add_res;
 }
 
+// TODO: Add Read Lock/Unlock
 int db_get(DB* self, Variant* key, Variant* value)
-{
-    int get_res;
-    pthread_mutex_lock(&self->wr_lock);
-    self->reader_count++;
-    pthread_mutex_unlock(&self->wr_lock);
-    
+{    
     if (memtable_get(self->memtable->list, key, value)) // If found in memtable return
-        get_res = 1;
+        return 1;
     else
-        get_res = sst_get(self->sst, key, value);
-    
-    pthread_mutex_lock(&self->wr_lock);
-    self->reader_count--;
-    
-    if (self->reader_count == 0)
-    {
-        pthread_cond_signal(&self->no_readers_cond);
-    }
-    pthread_mutex_unlock(&self->wr_lock);
-   
-    return get_res;
+        return sst_get(self->sst, key, value);
 }
 
 int db_remove(DB* self, Variant* key)

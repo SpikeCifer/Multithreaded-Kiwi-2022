@@ -64,10 +64,9 @@ void* _write_test(void* thread_w)
 void* _read_test(void* thread_r)
 {
 	Thread_info *parameters = (Thread_info*) thread_r;
-	
-	int* result = (int *)malloc(sizeof(int));
 	int found = 0;
 
+	int *result = &found;
 	Variant sk;
 	Variant sv;
 
@@ -95,7 +94,6 @@ void* _read_test(void* thread_r)
 	}
 
 	free(thread_r);
-	*result = found;
 	return (void *) result;
 }
 

@@ -1,14 +1,5 @@
 #include "bench.h"
 
-/* Checks if function is supported/valid. */
-int function_is_not_supported(char* function) 
-{	
-	return (strcmp(function, "read") != 0 && 
-			strcmp(function, "write") != 0 &&
-			strcmp(function, "mix") != 0 && 
-			strcmp(function, "readwrite") != 0);
-}
-
 /* Returns 0 if random key is needed, else returns 1 */
 void inquire_random_key(int argc) { random_key_is_required = (argc == 5); }
 
@@ -81,13 +72,39 @@ void _print_environment()
 	}
 }
 
-void init_program(int argc, char** argv)
+long int get_threads_num(long int requests_num, int remaining_threads) 
+{
+	if (requests_num < remaining_threads)	// Use when number of requests is less than MAX_THREAD_NUM
+		return requests_num; 				// Set number of threads equal to the user's request;
+
+	return remaining_threads;
+}
+
+int identify_request(char* request)
+{
+	if (strcmp(request, "read") == 0)
+		return READ_MODE;
+	else if (strcmp(request, "write") == 0)
+		return WRITE_MODE;
+	else if (strcmp(request, "mix") == 0)
+		return MIX_MODE;
+	else 
+		return UNSUPPORTED_MODE;
+}
+
+/* Function validates user given arguments,
+ * prints data about the environment and 
+ * returns the execution mode
+ */
+int init_program(int argc, char** argv)
 {
 	// Check that main arguments are valid
-	if (argc < 4 || function_is_not_supported(argv[1])) {
-		fprintf(stderr,"Usage: db-bench <write | read> <count> (key)\n");
+	int mode = identify_request(argv[1]);
+
+	if (argc < 3 || mode == UNSUPPORTED_MODE) {
+		fprintf(stderr, "Usage: db-bench <write | read | mix> <count> (key)\n");
 		exit(1);
-	}	
+	}
 
 	srand(time(NULL));
 
@@ -95,177 +112,125 @@ void init_program(int argc, char** argv)
 	_print_environment();
 
 	inquire_random_key(argc);
+	return mode;
 }
 
-long int get_threads_num(long int requests_num, int thread_count) 
+void mix_requests(void* db_pointer, const long int writer_count, const long int reader_count, long int thread_count)
 {
-	if (requests_num < thread_count)	// Use when number of requests is less than MAX_THREAD_NUM
-		return requests_num; 		// Set number of threads equal to the user's request;
-
-	return thread_count;
-}
-
-void write_requests(const int thread_num, const long int requests_num, void* db_pointer)
-{
-	pthread_t thread_ids[thread_num];
-
-	// Create Threads
-	for (int i = 0; i < thread_num; i++) {
-		Thread_info *thread_p = malloc(sizeof(Thread_info));
-
-		thread_p->id = i;
-		thread_p->load = requests_num/thread_num;
-		thread_p->db_p = db_pointer;
-
-		pthread_create(&thread_ids[i], NULL, _write_test, (void *) thread_p);
-	}
-
-	// Terminate Threads
-	for (int i = 0; i < thread_num; i++)
-		pthread_join(thread_ids[i], NULL);
-}
-
-long int read_requests(const int thread_num, const long requests_num, void* db_pointer)
-{
-	pthread_t thread_ids[thread_num];
+	int reader_threads = thread_count / 2; // 50-50 readers/writers (default)
+	int writer_threads = thread_count - reader_threads;
 
 	long int total_found = 0;
 
-	// Create Threads
-	for (int i = 0; i < thread_num; i++) {
-		Thread_info *thread_p = malloc(sizeof(Thread_info));
+	pthread_t reader_ids[reader_threads];
+	pthread_t writer_ids[writer_threads];
 
-		thread_p->id = i;
-		thread_p->load = requests_num/thread_num;
-		thread_p->db_p = db_pointer;
+	long long start_time = get_ustime_sec();
 
-		pthread_create(&thread_ids[i], NULL, _read_test, (void*) thread_p);
+	//Create Writers --------------------------------------
+	for (int i = 0; i < writer_threads; i++) {
+		Thread_info *writer_p = malloc(sizeof(Thread_info));
+
+		writer_p->id = i;
+		writer_p->load = writer_count/writer_threads;
+		writer_p->db_p = db_pointer;
+
+		pthread_create(&writer_ids[i], NULL, _write_test, (void *) writer_p);
+	}
+	//Create readers --------------------------------------
+	for (int i = 0; i < reader_threads; i++) {
+		Thread_info *reader_p = malloc(sizeof(Thread_info));
+
+		reader_p->id = i;
+		reader_p->load = reader_count/reader_threads;
+		reader_p->db_p = db_pointer;
+
+		pthread_create(&reader_ids[i], NULL, _read_test, (void*) reader_p);
 	}
 
-	// Terminate Threads	
-	for (int i = 0; i < thread_num; i++) {
+	//Join writers
+	for (int i = 0; i < writer_threads; i++)
+		pthread_join(writer_ids[i], NULL);
+
+	//Join readers
+	for (int i = 0; i < reader_threads; i++) {
 		int* res;
 
-		pthread_join(thread_ids[i], (void *) &res);
+		pthread_join(reader_ids[i], (void *) &res);
 		
 		total_found += *res;
 	}
+	db_close(db_pointer);
+	
+	double total_cost = get_ustime_sec() - start_time;
 
-	return total_found;
+	printf(LINE);
+	printf("|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
+		reader_count, total_found,
+		(double) (total_cost / reader_count),
+		(double) (reader_count / total_cost),
+		(double) total_cost);
+}
+
+Constructor_args *prepare_constructor_data(long int total_requests, int remaining_threads, void *db_pointer)
+{
+	Constructor_args *args_p = malloc(sizeof(Constructor_args));
+	args_p->thread_num = get_threads_num(total_requests, remaining_threads);
+	args_p->requests_num = total_requests;
+	args_p->db_pointer = db_pointer;
+	return args_p;
 }
 
 int main(int argc, char** argv)
 {
-	init_program(argc, argv);
+	int mode = init_program(argc, argv);
+	long int total_requests = atoi(argv[2]);
+	void *db_pointer = open_database();
+	char *results_str = NULL;
+	switch (mode)
+	{
+		case READ_MODE:
+		{
+			pthread_t readers_constructor;
+			pthread_create(&readers_constructor, NULL, create_readers, 
+				(void *) prepare_constructor_data(total_requests, MAX_THREAD_NUM, db_pointer));
 
-	int thread_input_count = atoi(argv[3]);
-	long int total_count = atoi(argv[2]);
-	long int thread_num = get_threads_num(total_count, thread_input_count);
-
-	void* db_pointer = open_database(); // It will be cast later to DB*
-
-	if (strcmp(argv[1], "write") == 0) {
-
-		// Time Execution
-		long long start_time = get_ustime_sec();
-
-		write_requests(thread_num, total_count, db_pointer);
-
-		double total_cost = get_ustime_sec() - start_time;
-
-		db_close(db_pointer);
-
-		// Print Results
-		printf(LINE);
-		printf("|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec);\n",
-			total_count, (double)(total_cost/total_count),
-			(double) (total_count/total_cost), total_cost);
-	}
-		
-	else if (strcmp(argv[1], "read") == 0) {
-
-		// Time Execution
-		long long start_time = get_ustime_sec();
-
-		long int total_found = read_requests(thread_num, total_count, db_pointer);
-
-		double total_cost = get_ustime_sec() - start_time;
-
-		db_close(db_pointer);
-
-		// Print Results
-		printf(LINE);
-		printf("|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
-			total_count, total_found,
-			(double) (total_cost / total_count),
-			(double) (total_count / total_cost),
-			(double) total_cost);
-	}
-	
-	else if (strcmp(argv[1], "readwrite") == 0) {
-		
-		int count = atoi(argv[2]);
-		int reader_count = count / 2; // 50-50 readers/writers requests (default)
-		int writer_count = count - reader_count;
-
-		int thread_count = atoi(argv[3]);
-		int thr_rd_count = thread_count / 2; // 50-50 readers/writers (default)
-		int thr_wr_count = thread_count - thr_rd_count;
-
-		long int total_found = 0;
-
-		pthread_t reader_ids[thr_rd_count];
-		pthread_t writer_ids[thr_wr_count];
-
-		long long start_time = get_ustime_sec();
-
-		//Create Writers --------------------------------------
-		for (int i = 0; i < thr_wr_count; i++) {
-			Thread_info *writer_p = malloc(sizeof(Thread_info));
-
-			writer_p->id = i;
-			writer_p->load = writer_count/thr_wr_count;
-			writer_p->db_p = db_pointer;
-
-			pthread_create(&writer_ids[i], NULL, _write_test, (void *) writer_p);
-		}
-		//Create readers --------------------------------------
-		for (int i = 0; i < thr_rd_count; i++) {
-			Thread_info *reader_p = malloc(sizeof(Thread_info));
-
-			reader_p->id = i;
-			reader_p->load = reader_count/thr_rd_count;
-			reader_p->db_p = db_pointer;
-
-			pthread_create(&reader_ids[i], NULL, _read_test, (void*) reader_p);
+			pthread_join(readers_constructor, (void **) &results_str);
+			break;
 		}
 
-		//Join writers
-		for (int i = 0; i < thr_wr_count; i++)
-			pthread_join(writer_ids[i], NULL);
-		//Join readers
-		for (int i = 0; i < thr_rd_count; i++) {
-			int* res;
+		case WRITE_MODE:
+		{
+			pthread_t writers_constructor;
+			pthread_create(&writers_constructor, NULL, create_writers, 
+				(void *) prepare_constructor_data(total_requests, MAX_THREAD_NUM, db_pointer));
 
-			pthread_join(reader_ids[i], (void *) &res);
+			pthread_join(writers_constructor, (void **) &results_str);
+			break;
+		}
+
+		case MIX_MODE:
+		{
+			float read_write_ratio;
+			printf("Please provide the read percentage: ");
+			scanf("%f", &read_write_ratio);
 			
-			total_found += *res;
+			handle_mixed_requests(total_requests, read_write_ratio, db_pointer);
+			break;
 		}
-		db_close(db_pointer);
-		
-		double total_cost = get_ustime_sec() - start_time;
 
-		printf(LINE);
-		printf("|Random-Read	(done:%d, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
-			reader_count, total_found,
-			(double) (total_cost / reader_count),
-			(double) (reader_count / total_cost),
-			(double) total_cost);
-		
-		
+		case UNSUPPORTED_MODE:
+		{
+			printf("Request mode not supported");
+			exit(0);
+		}
 	}
-	
-		
 
+	db_close(db_pointer);
+
+	printf(LINE);
+	printf("%s", results_str);
+	printf(LINE);
+	
 	return 1;
 }
