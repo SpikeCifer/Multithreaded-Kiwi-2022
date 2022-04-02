@@ -6,6 +6,54 @@
 #include "utils.h"
 #include "log.h"
 
+void read_lock_db(DB* self)
+{
+    pthread_mutex_lock(&self->lock);
+
+    while (self->writers_waiting > 0 || self->active_writers > 0)
+        pthread_cond_wait(&self->condition, &self->lock);
+
+    self->active_readers++;
+
+    pthread_mutex_unlock(&self->lock);
+}
+
+void read_unlock_db(DB* self)
+{
+    pthread_mutex_lock(&self->lock);
+
+    self->active_readers--;
+    if(self->active_readers == 0)
+        pthread_cond_broadcast(&self->condition);
+
+    pthread_mutex_unlock(&self->lock);
+}
+
+void write_lock_db(DB* self)
+{
+    pthread_mutex_lock(&self->lock);
+
+    self->writers_waiting++;
+    while(self->active_readers > 0 || self->active_writers > 0)
+        pthread_cond_wait(&self->condition, &self->lock);
+
+    self->writers_waiting--;
+    self->active_writers++;
+
+    pthread_mutex_unlock(&self->lock);
+}
+
+void write_unlock_db(DB* self)
+{
+    pthread_mutex_lock(&self->lock);
+
+    self->active_writers--;
+    if(self->active_writers == 0)
+        pthread_cond_broadcast(&self->condition);
+
+    pthread_mutex_unlock(&self->lock);
+}
+
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
     DB* self = calloc(1, sizeof(DB));
@@ -14,17 +62,19 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
 
     strncpy(self->basedir, basedir, MAX_FILENAME);
     self->sst = sst_new(basedir, cache_size);
-
-    pthread_mutex_init(&self->wr_lock, NULL);
-    pthread_cond_init(&self->writers_cond, NULL);
-    pthread_cond_init(&self->readers_cond, NULL);
-    self->active_readers = 0;
-    self->active_writers = 0;
-    self->waiting_readers = 0;
-    self->waiting_writers = 0;
-    
     Log* log = log_new(self->sst->basedir);
     self->memtable = memtable_new(log);
+
+    pthread_mutex_init(&self->lock, NULL);
+    
+    if (pthread_cond_init(&self->condition, NULL) != 0)
+    {
+        printf("Error while trying to initialize db's condition variable");
+        exit(0);
+    }
+    self->writers_waiting = 0;
+    self->active_writers = 0; // This is in reality a boolean value
+    self->active_readers = 0;
     return self;
 }
 
@@ -49,25 +99,19 @@ void db_close(DB *self)
     log_free(self->memtable->log);
     memtable_free(self->memtable);
 
+
+    pthread_cond_destroy(&self->condition);
+    pthread_mutex_destroy(&self->lock);
     free(self);
-    pthread_cond_destroy(&self->readers_cond);
-    pthread_cond_destroy(&self->writers_cond);
-    pthread_mutex_destroy(&self->wr_lock);
 }
 
 // TODO Add Write Lock/Unlock
 int db_add(DB* self, Variant* key, Variant* value)
-{
-    pthread_mutex_lock(&self->wr_lock);
-    self->waiting_writers++;
-    while(self->active_readers > 0 || self->active_writers > 0)
-    {
-        pthread_cond_wait(&self->writers_cond, &self->wr_lock);
-    }
-    self->waiting_writers--;
-    self->active_writers++;
-    pthread_mutex_unlock(&self->wr_lock);
-    
+{   
+    int add_res = 0;
+    write_lock_db(self);
+
+    // HERE LIES THE DEDLOCK (SOMEWHERE)
     if (memtable_needs_compaction(self->memtable))
     {   
         INFO("Starting compaction of the memtable after %d insertions and %d deletions",
@@ -75,47 +119,25 @@ int db_add(DB* self, Variant* key, Variant* value)
         sst_merge(self->sst, self->memtable);
         memtable_reset(self->memtable);
     }
-    int add_res = memtable_add(self->memtable, key, value);
 
-    pthread_mutex_lock(&self->wr_lock);
-    self->active_writers--;
-    if(self->active_writers == 0)
-    {
-        pthread_cond_signal(&self->readers_cond);
-        pthread_cond_signal(&self->writers_cond);
-    }
-    pthread_mutex_unlock(&self->wr_lock);
+    add_res = memtable_add(self->memtable, key, value);
+
+    write_unlock_db(self);
     
     return add_res;
 }
 
-// TODO: Add Read Lock/Unlock
 int db_get(DB* self, Variant* key, Variant* value)
 {   
     int result;
-    pthread_mutex_lock(&self->wr_lock);
-    self->waiting_readers++;
-    while (self->active_writers > 0)
-    {
-        pthread_cond_wait(&self->readers_cond, &self->wr_lock);
-    }
-    self->waiting_readers--;
-    self->active_readers++;
-    pthread_mutex_unlock(&self->wr_lock);
+    read_lock_db(self);
     
     if (memtable_get(self->memtable->list, key, value)) // If found in memtable return
         result = 1;
     else
         result = sst_get(self->sst, key, value);
-
-    pthread_mutex_lock(&self->wr_lock);
-    self->active_readers--;
-    if(self->active_readers == 0)
-    {
-        pthread_cond_signal(&self->writers_cond);
-        pthread_cond_signal(&self->readers_cond);
-    }
-    pthread_mutex_unlock(&self->wr_lock);
+    
+    read_unlock_db(self);
     
     return result;
 }

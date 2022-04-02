@@ -13,13 +13,12 @@ typedef struct _db {
     SST* sst;
     MemTable* memtable;
     
-    pthread_mutex_t wr_lock;
-    pthread_cond_t readers_cond;
-    pthread_cond_t writers_cond;
-    int active_readers;
+    pthread_mutex_t lock;
+    pthread_cond_t condition;
+
+    int writers_waiting;
     int active_writers;
-    int waiting_readers;
-    int waiting_writers;
+    int active_readers;
 } DB;
 
 

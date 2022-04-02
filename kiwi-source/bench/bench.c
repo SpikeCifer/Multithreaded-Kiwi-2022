@@ -115,63 +115,6 @@ int init_program(int argc, char** argv)
 	return mode;
 }
 
-void mix_requests(void* db_pointer, const long int writer_count, const long int reader_count, long int thread_count)
-{
-	int reader_threads = thread_count / 2; // 50-50 readers/writers (default)
-	int writer_threads = thread_count - reader_threads;
-
-	long int total_found = 0;
-
-	pthread_t reader_ids[reader_threads];
-	pthread_t writer_ids[writer_threads];
-
-	long long start_time = get_ustime_sec();
-
-	//Create Writers --------------------------------------
-	for (int i = 0; i < writer_threads; i++) {
-		Thread_info *writer_p = malloc(sizeof(Thread_info));
-
-		writer_p->id = i;
-		writer_p->load = writer_count/writer_threads;
-		writer_p->db_p = db_pointer;
-
-		pthread_create(&writer_ids[i], NULL, _write_test, (void *) writer_p);
-	}
-	//Create readers --------------------------------------
-	for (int i = 0; i < reader_threads; i++) {
-		Thread_info *reader_p = malloc(sizeof(Thread_info));
-
-		reader_p->id = i;
-		reader_p->load = reader_count/reader_threads;
-		reader_p->db_p = db_pointer;
-
-		pthread_create(&reader_ids[i], NULL, _read_test, (void*) reader_p);
-	}
-
-	//Join writers
-	for (int i = 0; i < writer_threads; i++)
-		pthread_join(writer_ids[i], NULL);
-
-	//Join readers
-	for (int i = 0; i < reader_threads; i++) {
-		int* res;
-
-		pthread_join(reader_ids[i], (void *) &res);
-		
-		total_found += *res;
-	}
-	db_close(db_pointer);
-	
-	double total_cost = get_ustime_sec() - start_time;
-
-	printf(LINE);
-	printf("|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
-		reader_count, total_found,
-		(double) (total_cost / reader_count),
-		(double) (reader_count / total_cost),
-		(double) total_cost);
-}
-
 Constructor_args *prepare_constructor_data(long int total_requests, int remaining_threads, void *db_pointer)
 {
 	Constructor_args *args_p = malloc(sizeof(Constructor_args));
