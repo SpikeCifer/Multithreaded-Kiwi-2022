@@ -14,12 +14,14 @@ typedef struct _db {
     MemTable* memtable;
     
     pthread_mutex_t wr_lock;
-    pthread_mutex_t rd_lock;
-    pthread_cond_t no_readers_cond;
-    int reader_count;
+    pthread_cond_t readers_cond;
+    pthread_cond_t writers_cond;
+    int active_readers;
+    int active_writers;
+    int waiting_readers;
+    int waiting_writers;
 } DB;
 
-static DB* database;
 
 DB* db_open(const char *basedir);
 DB* db_open_ex(const char *basedir, uint64_t cache_size);

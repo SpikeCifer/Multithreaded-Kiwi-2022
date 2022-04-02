@@ -33,6 +33,8 @@ typedef struct thread_info{
     void* db_p;
 }Thread_info;
 
+Constructor_args *prepare_constructor_data(long int total_requests, int remaining_threads, void *db_pointer);
+
 long long get_ustime_sec(void);
 void _random_key(char *key,int length);
 

@@ -99,11 +99,5 @@ void* _read_test(void* thread_r)
 
 void* open_database()
 {
-	database = db_open(DATAS);
-	return database;
-}
-
-void _mix_test(long int read_count, long int write_count)
-{
-	printf("Unimplimented mix function");
+	return db_open(DATAS);
 }

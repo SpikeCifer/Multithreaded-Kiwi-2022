@@ -46,7 +46,7 @@ void* create_readers(void *arguments)
 void* create_writers(void* arguments)
 {
 	Constructor_args *args = (Constructor_args *)arguments;
-	char *results_str = malloc(200);
+	char *results_str = (char*)malloc(200*sizeof(char));
 
 	pthread_t thread_ids[args->thread_num];
 
@@ -77,6 +77,22 @@ void* create_writers(void* arguments)
 	return results_str;
 }
 
-void handle_mixed_requests(const long int total_requests, double read_percentage, void* db_pointer)
+void handle_mixed_requests(const long int total_requests, double read_percentage, void* db_pointer, char* results)
 {
+	char *readers_results = (char*)malloc(100*sizeof(char));
+	char *writers_results = (char*)malloc(100*sizeof(char));
+
+	long int writer_requests = total_requests * read_percentage/100;
+	long int reader_requests = total_requests - writer_requests;
+
+	pthread_t writers_id, readers_id;
+	
+	pthread_create(&writers_id, NULL, create_writers, (void *) prepare_constructor_data(writer_requests, MAX_THREAD_NUM/2, db_pointer));
+	pthread_create(&readers_id, NULL, create_readers, (void *) prepare_constructor_data(reader_requests, MAX_THREAD_NUM/2, db_pointer));
+
+	pthread_join(writers_id, (void**) &writers_results);
+	pthread_join(readers_id, (void**) &readers_results);
+
+	strcpy(results, writers_results);
+	strcat(results, readers_results);
 }

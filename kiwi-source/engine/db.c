@@ -1,13 +1,10 @@
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 #include "db.h"
 #include "indexer.h"
 #include "utils.h"
 #include "log.h"
-
-int thread_counter = 0;
-int readers_count = 0;
-int writers_count = 0;
 
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
@@ -19,9 +16,12 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
     self->sst = sst_new(basedir, cache_size);
 
     pthread_mutex_init(&self->wr_lock, NULL);
-    pthread_mutex_init(&self->rd_lock, NULL);
-    pthread_cond_init(&self->no_readers_cond, NULL);
-    self->reader_count = 0;
+    pthread_cond_init(&self->writers_cond, NULL);
+    pthread_cond_init(&self->readers_cond, NULL);
+    self->active_readers = 0;
+    self->active_writers = 0;
+    self->waiting_readers = 0;
+    self->waiting_writers = 0;
     
     Log* log = log_new(self->sst->basedir);
     self->memtable = memtable_new(log);
@@ -50,7 +50,8 @@ void db_close(DB *self)
     memtable_free(self->memtable);
 
     free(self);
-    pthread_cond_destroy(&self->no_readers_cond);
+    pthread_cond_destroy(&self->readers_cond);
+    pthread_cond_destroy(&self->writers_cond);
     pthread_mutex_destroy(&self->wr_lock);
 }
 
@@ -58,7 +59,15 @@ void db_close(DB *self)
 int db_add(DB* self, Variant* key, Variant* value)
 {
     pthread_mutex_lock(&self->wr_lock);
-
+    self->waiting_writers++;
+    while(self->active_readers > 0 || self->active_writers > 0)
+    {
+        pthread_cond_wait(&self->writers_cond, &self->wr_lock);
+    }
+    self->waiting_writers--;
+    self->active_writers++;
+    pthread_mutex_unlock(&self->wr_lock);
+    
     if (memtable_needs_compaction(self->memtable))
     {   
         INFO("Starting compaction of the memtable after %d insertions and %d deletions",
@@ -67,7 +76,14 @@ int db_add(DB* self, Variant* key, Variant* value)
         memtable_reset(self->memtable);
     }
     int add_res = memtable_add(self->memtable, key, value);
-    
+
+    pthread_mutex_lock(&self->wr_lock);
+    self->active_writers--;
+    if(self->active_writers == 0)
+    {
+        pthread_cond_signal(&self->readers_cond);
+        pthread_cond_signal(&self->writers_cond);
+    }
     pthread_mutex_unlock(&self->wr_lock);
     
     return add_res;
@@ -75,11 +91,33 @@ int db_add(DB* self, Variant* key, Variant* value)
 
 // TODO: Add Read Lock/Unlock
 int db_get(DB* self, Variant* key, Variant* value)
-{    
+{   
+    int result;
+    pthread_mutex_lock(&self->wr_lock);
+    self->waiting_readers++;
+    while (self->active_writers > 0)
+    {
+        pthread_cond_wait(&self->readers_cond, &self->wr_lock);
+    }
+    self->waiting_readers--;
+    self->active_readers++;
+    pthread_mutex_unlock(&self->wr_lock);
+    
     if (memtable_get(self->memtable->list, key, value)) // If found in memtable return
-        return 1;
+        result = 1;
     else
-        return sst_get(self->sst, key, value);
+        result = sst_get(self->sst, key, value);
+
+    pthread_mutex_lock(&self->wr_lock);
+    self->active_readers--;
+    if(self->active_readers == 0)
+    {
+        pthread_cond_signal(&self->writers_cond);
+        pthread_cond_signal(&self->readers_cond);
+    }
+    pthread_mutex_unlock(&self->wr_lock);
+    
+    return result;
 }
 
 int db_remove(DB* self, Variant* key)

@@ -186,13 +186,13 @@ int main(int argc, char** argv)
 	int mode = init_program(argc, argv);
 	long int total_requests = atoi(argv[2]);
 	void *db_pointer = open_database();
-	char *results_str = NULL;
+	char *results_str = (char*)malloc(200*sizeof(char));
 	switch (mode)
 	{
 		case READ_MODE:
 		{
 			pthread_t readers_constructor;
-			pthread_create(&readers_constructor, NULL, create_readers, 
+			pthread_create(&readers_constructor, NULL, create_readers,
 				(void *) prepare_constructor_data(total_requests, MAX_THREAD_NUM, db_pointer));
 
 			pthread_join(readers_constructor, (void **) &results_str);
@@ -215,7 +215,7 @@ int main(int argc, char** argv)
 			printf("Please provide the read percentage: ");
 			scanf("%f", &read_write_ratio);
 			
-			handle_mixed_requests(total_requests, read_write_ratio, db_pointer);
+			handle_mixed_requests(total_requests, read_write_ratio, db_pointer, results_str);
 			break;
 		}
 
