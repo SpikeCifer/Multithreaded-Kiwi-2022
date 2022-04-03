@@ -660,9 +660,9 @@ int sst_get(SST* self, Variant* key, Variant* value)
             DEBUG("Serving sst_get request from immutable memtable");
             ret = memtable_get(self->immutable_list, key, value);
         }
-        pthread_mutex_lock(&self->lock); // Gather all locks before starting unlocking process (2PL)
-
         pthread_mutex_unlock(&self->cv_lock);
+        
+        pthread_mutex_lock(&self->lock);
 
         if (ret)
             return ret;

@@ -111,7 +111,6 @@ int db_add(DB* self, Variant* key, Variant* value)
     int add_res = 0;
     write_lock_db(self);
 
-    // HERE LIES THE DEDLOCK (SOMEWHERE)
     if (memtable_needs_compaction(self->memtable))
     {   
         INFO("Starting compaction of the memtable after %d insertions and %d deletions",
