@@ -9,7 +9,6 @@
 
 #define KSIZE (16)
 #define VSIZE (1000)
-#define MAX_THREAD_NUM (20)
 
 #define READ_MODE 0
 #define WRITE_MODE 1
@@ -43,6 +42,5 @@ void* create_readers(void *args);
 
 void* _write_test(void *thread_w);
 void* _read_test(void *thread_r);
-void _mix_test(long int read_count, long int write_count);
 
 void* open_database();

@@ -655,11 +655,13 @@ int sst_get(SST* self, Variant* key, Variant* value)
         int ret = 0;
 
         pthread_mutex_lock(&self->cv_lock);
+        
         if (self->immutable)
         {
             DEBUG("Serving sst_get request from immutable memtable");
             ret = memtable_get(self->immutable_list, key, value);
         }
+
         pthread_mutex_unlock(&self->cv_lock);
         
         pthread_mutex_lock(&self->lock);

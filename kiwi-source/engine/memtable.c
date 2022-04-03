@@ -159,6 +159,6 @@ void memtable_extract_node(SkipNode* node, Variant* key, Variant* value, OPT* op
         if (*opt == ADD)
             buffer_putnstr(value, encoded, length - 1);
 
-//        DEBUG("memtable_extract_node: %.*s %.*s opt: %d", key->length, key->mem, value->length, value->mem, *opt);
+        // DEBUG("memtable_extract_node: %.*s %.*s opt: %d", key->length, key->mem, value->length, value->mem, *opt);
     }
 }

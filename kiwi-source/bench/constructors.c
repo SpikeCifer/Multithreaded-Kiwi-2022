@@ -77,8 +77,12 @@ void* create_writers(void* arguments)
 	return results_str;
 }
 
-void handle_mixed_requests(const long int total_requests, double read_percentage, void* db_pointer, char* results)
+void handle_mixed_requests(long int total_requests, int max_threads, void* db_pointer, char* results)
 {
+	float read_percentage;
+	printf("Please provide the Read percentage: ");
+	scanf("%f", &read_percentage);
+
 	char *readers_results = (char*)malloc(100*sizeof(char));
 	char *writers_results = (char*)malloc(100*sizeof(char));
 
@@ -87,8 +91,8 @@ void handle_mixed_requests(const long int total_requests, double read_percentage
 
 	pthread_t writers_id, readers_id;
 	
-	pthread_create(&writers_id, NULL, create_writers, (void *) prepare_constructor_data(writer_requests, MAX_THREAD_NUM/2, db_pointer));
-	pthread_create(&readers_id, NULL, create_readers, (void *) prepare_constructor_data(reader_requests, MAX_THREAD_NUM/2, db_pointer));
+	pthread_create(&writers_id, NULL, create_writers, (void *) prepare_constructor_data(writer_requests, max_threads/2, db_pointer));
+	pthread_create(&readers_id, NULL, create_readers, (void *) prepare_constructor_data(reader_requests, max_threads/2, db_pointer));
 
 	pthread_join(writers_id, (void**) &writers_results);
 	pthread_join(readers_id, (void**) &readers_results);

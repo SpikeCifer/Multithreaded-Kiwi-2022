@@ -86,7 +86,7 @@ int identify_request(char* request)
 		return READ_MODE;
 	else if (strcmp(request, "write") == 0)
 		return WRITE_MODE;
-	else if (strcmp(request, "mix") == 0)
+	else if (strcmp(request, "readwrite") == 0)
 		return MIX_MODE;
 	else 
 		return UNSUPPORTED_MODE;
@@ -101,8 +101,8 @@ int init_program(int argc, char** argv)
 	// Check that main arguments are valid
 	int mode = identify_request(argv[1]);
 
-	if (argc < 3 || mode == UNSUPPORTED_MODE) {
-		fprintf(stderr, "Usage: db-bench <write | read | mix> <count> (key)\n");
+	if (argc < 4 || mode == UNSUPPORTED_MODE) {
+		fprintf(stderr, "Usage: db-bench <write | read | readwrite> <count> <threads> (key)\n");
 		exit(1);
 	}
 
@@ -130,13 +130,15 @@ int main(int argc, char** argv)
 	long int total_requests = atoi(argv[2]);
 	void *db_pointer = open_database();
 	char *results_str = (char*)malloc(200*sizeof(char));
+
+	int max_threads = atoi(argv[3]);
 	switch (mode)
 	{
 		case READ_MODE:
 		{
 			pthread_t readers_constructor;
 			pthread_create(&readers_constructor, NULL, create_readers,
-				(void *) prepare_constructor_data(total_requests, MAX_THREAD_NUM, db_pointer));
+				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
 
 			pthread_join(readers_constructor, (void **) &results_str);
 			break;
@@ -146,19 +148,15 @@ int main(int argc, char** argv)
 		{
 			pthread_t writers_constructor;
 			pthread_create(&writers_constructor, NULL, create_writers, 
-				(void *) prepare_constructor_data(total_requests, MAX_THREAD_NUM, db_pointer));
+				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
 
 			pthread_join(writers_constructor, (void **) &results_str);
 			break;
 		}
 
 		case MIX_MODE:
-		{
-			float read_write_ratio;
-			printf("Please provide the read percentage: ");
-			scanf("%f", &read_write_ratio);
-			
-			handle_mixed_requests(total_requests, read_write_ratio, db_pointer, results_str);
+		{			
+			handle_mixed_requests(total_requests, max_threads, db_pointer, results_str);
 			break;
 		}
 
