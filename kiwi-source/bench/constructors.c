@@ -82,8 +82,8 @@ void handle_mixed_requests(const long int total_requests, double read_percentage
 	char *readers_results = (char*)malloc(100*sizeof(char));
 	char *writers_results = (char*)malloc(100*sizeof(char));
 
-	long int writer_requests = total_requests * read_percentage/100;
-	long int reader_requests = total_requests - writer_requests;
+	long int reader_requests = total_requests * read_percentage/100;
+	long int writer_requests = total_requests - reader_requests;
 
 	pthread_t writers_id, readers_id;
 	
