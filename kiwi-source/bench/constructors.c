@@ -7,9 +7,10 @@ void* create_readers(void *arguments)
 
 	pthread_t thread_ids[args->thread_num];
 
-	long long start_time = get_ustime_sec();
 	double total_cost = 0;
 	long int total_found = 0;
+
+	long long start_time = get_ustime_sec();
 
 	// Create Threads
 	for (int i = 0; i < args->thread_num; i++) {
@@ -38,7 +39,7 @@ void* create_readers(void *arguments)
 			(double) (total_cost / args->requests_num),
 			(double) (args->requests_num / total_cost),
 			(double) total_cost);
-
+	
 	free(args);
 	return results_str;
 }
@@ -72,31 +73,72 @@ void* create_writers(void* arguments)
 	sprintf(results_str, "|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec);\n",
 			args->requests_num, (double)(total_cost/args->requests_num),
 			(double) (args->requests_num/total_cost), total_cost);
-
+		
 	free(args);
 	return results_str;
 }
 
+int get_read_percentage()
+{
+	int read_percentage = 0;
+	do 
+	{
+		printf("Please provide the Read percentage [0-100]: ");
+		scanf("%d", &read_percentage);
+	} while(read_percentage < 0 || read_percentage > 100);
+
+	return read_percentage;
+}
+
 void handle_mixed_requests(long int total_requests, int max_threads, void* db_pointer, char* results)
 {
-	float read_percentage;
-	printf("Please provide the Read percentage: ");
-	scanf("%f", &read_percentage);
-
 	char *readers_results = (char*)malloc(100*sizeof(char));
 	char *writers_results = (char*)malloc(100*sizeof(char));
 
-	long int reader_requests = total_requests * read_percentage/100;
-	long int writer_requests = total_requests - reader_requests;
+	int read_percentage = get_read_percentage();
 
-	pthread_t writers_id, readers_id;
-	
-	pthread_create(&writers_id, NULL, create_writers, (void *) prepare_constructor_data(writer_requests, max_threads/2, db_pointer));
-	pthread_create(&readers_id, NULL, create_readers, (void *) prepare_constructor_data(reader_requests, max_threads/2, db_pointer));
+	// If no write requests don't use threads for writing.
+	if (read_percentage == 0)
+	{
+		pthread_t writers_constructor;
+		pthread_create(&writers_constructor, NULL, create_writers, 
+			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
 
-	pthread_join(writers_id, (void**) &writers_results);
-	pthread_join(readers_id, (void**) &readers_results);
+		pthread_join(writers_constructor, (void **) &readers_results);
+		strcpy(results, readers_results);
+		return;
+	}
 
-	strcpy(results, writers_results);
-	strcat(results, readers_results);
+	// No reads, only writes
+	else if (read_percentage == 100)
+	{
+		pthread_t readers_constructor;
+		pthread_create(&readers_constructor, NULL, create_readers,
+			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
+
+		pthread_join(readers_constructor, (void **) &writers_results);
+		strcpy(results, writers_results);
+		return;
+	}
+
+	// The most expected senario
+	else
+	{
+		long int reader_requests = total_requests * read_percentage/100;
+		long int writer_requests = total_requests - reader_requests;
+
+		float read_write_ratio = reader_requests/writer_requests;
+
+
+		pthread_t writers_id, readers_id;
+
+		pthread_create(&writers_id, NULL, create_writers, (void *) prepare_constructor_data(writer_requests, max_threads/2, db_pointer));
+		pthread_create(&readers_id, NULL, create_readers, (void *) prepare_constructor_data(reader_requests, max_threads/2, db_pointer));
+
+		pthread_join(writers_id, (void**) &writers_results);
+		pthread_join(readers_id, (void**) &readers_results);
+
+		strcpy(results, writers_results);
+		strcat(results, readers_results);
+	}
 }
