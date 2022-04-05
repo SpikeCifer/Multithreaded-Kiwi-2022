@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "log.h"
 
-// -------------LOCK FUNCTIONS -------------------
+// ---------------- DB LOCK FUNCTIONS ----------------
 void read_lock_db(DB* self)
 {
     pthread_mutex_lock(&self->lock);
@@ -54,7 +54,7 @@ void write_unlock_db(DB* self)
 
     pthread_mutex_unlock(&self->lock);
 }
-// ------------------------------------------------
+// ----------------------------------------------------
 
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
@@ -106,7 +106,6 @@ void db_close(DB *self)
     free(self);
 }
 
-// TODO Add Write Lock/Unlock
 int db_add(DB* self, Variant* key, Variant* value)
 {   
     int add_res = 0;
@@ -213,7 +212,7 @@ void db_iterator_free(DBIterator* self)
 
 static void _db_iterator_add_level0(DBIterator* self, Variant* key)
 {
-    // Createa all iterators for scanning level0. If is it possible
+    // Create all iterators for scanning level 0. If is it possible
     // try to create a chained iterator for non overlapping sequences.
 
     int i = 0;

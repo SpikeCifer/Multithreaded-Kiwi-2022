@@ -141,7 +141,7 @@ int main(int argc, char** argv)
 			if (pthread_create(&readers_constructor, NULL, create_readers,
 				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
 			{
-				printf("Error while trying to create readers constructor");
+				printf("Error while trying to create readers constructor\n");
 				exit(0);
 			}
 
@@ -155,7 +155,7 @@ int main(int argc, char** argv)
 			if(pthread_create(&writers_constructor, NULL, create_writers, 
 				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
 			{
-				printf("Error while trying to create writers constructor");
+				printf("Error while trying to create writers constructor\n");
 				exit(0);
 			}
 
@@ -169,9 +169,9 @@ int main(int argc, char** argv)
 			break;
 		}
 
-		case UNSUPPORTED_MODE:
+		default:
 		{
-			printf("Request mode not supported");
+			printf("Request mode not supported\n");
 			exit(0);
 		}
 	}

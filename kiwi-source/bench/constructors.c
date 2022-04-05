@@ -78,7 +78,11 @@ void* create_readers(void *arguments)
 		thread_p->db_p = args->db_pointer;
 
 		thread_times[i] = get_ustime_sec();
-		pthread_create(&thread_ids[i], NULL, _read_test, (void*) thread_p);
+		if(pthread_create(&thread_ids[i], NULL, _read_test, (void*) thread_p) != 0)
+		{
+			printf("Error while trying to create reader thread\n");
+			exit(0);
+		}
 	}
 
 	// Terminate Threads	
@@ -123,7 +127,11 @@ void* create_writers(void* arguments)
 		thread_p->db_p = args->db_pointer;
 
 		thread_times[i] = get_ustime_sec();
-		pthread_create(&thread_ids[i], NULL, _write_test, (void *) thread_p);
+		if(pthread_create(&thread_ids[i], NULL, _write_test, (void *) thread_p) != 0)
+		{
+			printf("Error while trying to create writer thread\n");
+			exit(0);
+		}
 	}
 
 	// Terminate Threads
@@ -133,7 +141,6 @@ void* create_writers(void* arguments)
 		thread_times[i] = get_ustime_sec() - thread_times[i];
 	}
 		
-	
 	double total_cost = get_ustime_sec() - start_time;
 
 	sprintf(results_str, "|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec); avg thread cost: %.6f(sec)\n",
@@ -152,27 +159,36 @@ void handle_mixed_requests(long int total_requests, int max_threads, void* db_po
 
 	float read_percentage = get_read_percentage();
 
-	// No reads, only writes
-	if (read_percentage == 0.0)
-	{
-		pthread_t writers_constructor;
-		pthread_create(&writers_constructor, NULL, create_writers, 
-			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
-
-		pthread_join(writers_constructor, (void **) &writers_results);
-		strcpy(results, writers_results);
-		return;
-	}
 
 	// No writes, only reads
-	else if (read_percentage == 1.0)
+	if (read_percentage == 1.0)
 	{
 		pthread_t readers_constructor;
-		pthread_create(&readers_constructor, NULL, create_readers,
-			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
+		if(pthread_create(&readers_constructor, NULL, create_readers,
+			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
+		{
+			printf("Error while trying to create readers constructor\n");
+			exit(0);
+		}
 
 		pthread_join(readers_constructor, (void **) &readers_results);
 		strcpy(results, readers_results);
+		return;
+	}
+
+	// No reads, only writes
+	else if (read_percentage == 0.0)
+	{
+		pthread_t writers_constructor;
+		if (pthread_create(&writers_constructor, NULL, create_writers, 
+			(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
+		{
+			printf("Error while trying to create writers constructor\n");
+			exit(0);
+		}
+
+		pthread_join(writers_constructor, (void **) &writers_results);
+		strcpy(results, writers_results);
 		return;
 	}
 
@@ -190,14 +206,14 @@ void handle_mixed_requests(long int total_requests, int max_threads, void* db_po
 		if(pthread_create(&writers_id, NULL, create_writers, 
 			(void *) prepare_constructor_data(writer_requests, max_writers, db_pointer)) != 0)
 		{
-			printf("Error while trying to create writers constructor");
+			printf("Error while trying to create writers constructor\n");
 			exit(0);
 		}
 
 		if(pthread_create(&readers_id, NULL, create_readers, 
 			(void *) prepare_constructor_data(reader_requests, max_readers, db_pointer)) != 0)
 		{
-			printf("Error while trying to create readers constructor"); // PANIC MACRO COULD BE USED IN ANY OF THESE
+			printf("Error while trying to create readers constructor\n"); // PANIC MACRO COULD BE USED IN ANY OF THESE
 			exit(0);
 		}
 
@@ -206,5 +222,6 @@ void handle_mixed_requests(long int total_requests, int max_threads, void* db_po
 
 		strcpy(results, writers_results);
 		strcat(results, readers_results);
+		return;
 	}
 }
