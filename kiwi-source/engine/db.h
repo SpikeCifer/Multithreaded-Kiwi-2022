@@ -17,7 +17,7 @@ typedef struct _db {
     pthread_cond_t condition;
 
     int writers_waiting;
-    int active_writers;
+    int writer_active;
     int active_readers;
 } DB;
 

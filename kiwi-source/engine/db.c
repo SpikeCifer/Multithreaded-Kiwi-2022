@@ -11,7 +11,7 @@ void read_lock_db(DB* self)
 {
     pthread_mutex_lock(&self->lock);
 
-    while (self->writers_waiting > 0 || self->active_writers > 0)
+    while (self->writers_waiting > 0 || self->writer_active > 0)
         pthread_cond_wait(&self->condition, &self->lock);
 
     self->active_readers++;
@@ -35,11 +35,11 @@ void write_lock_db(DB* self)
     pthread_mutex_lock(&self->lock);
 
     self->writers_waiting++;
-    while(self->active_readers > 0 || self->active_writers > 0)
+    while(self->active_readers > 0 || self->writer_active > 0)
         pthread_cond_wait(&self->condition, &self->lock);
 
     self->writers_waiting--;
-    self->active_writers++;
+    self->writer_active++;
     
     pthread_mutex_unlock(&self->lock);
 }
@@ -48,8 +48,8 @@ void write_unlock_db(DB* self)
 {
     pthread_mutex_lock(&self->lock);
 
-    self->active_writers--;
-    if(self->active_writers == 0)
+    self->writer_active--;
+    if(self->writer_active == 0)
         pthread_cond_broadcast(&self->condition);
 
     pthread_mutex_unlock(&self->lock);
@@ -74,7 +74,7 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
         PANIC("Error while trying to initialize db's condition variable");
 
     self->writers_waiting = 0;
-    self->active_writers = 0; // This is in reality a boolean value
+    self->writer_active = 0; // This is in reality a boolean value
     self->active_readers = 0;
     return self;
 }
