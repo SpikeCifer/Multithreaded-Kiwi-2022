@@ -47,6 +47,14 @@ int share_threads(int max_threads, float read_percentage)
 		return res++; 
 }
 
+double calc_avg_cost(long long thread_times[], int thread_num)
+{
+	long long sum = 0;
+	for (int i = 0; i < thread_num; i++)
+		sum += thread_times[i];
+	
+	return sum/thread_num;
+}
 // -------------------------- CONSTRUCTORS ------------------------------
 void* create_readers(void *arguments)
 {
@@ -54,6 +62,7 @@ void* create_readers(void *arguments)
 	char *results_str = malloc(200);
 
 	pthread_t thread_ids[args->thread_num];
+	long long thread_times[args->thread_num];
 
 	double total_cost = 0;
 	long int total_found = 0;
@@ -68,6 +77,7 @@ void* create_readers(void *arguments)
 		thread_p->load = args->requests_num/args->thread_num;
 		thread_p->db_p = args->db_pointer;
 
+		thread_times[i] = get_ustime_sec();
 		pthread_create(&thread_ids[i], NULL, _read_test, (void*) thread_p);
 	}
 
@@ -76,17 +86,19 @@ void* create_readers(void *arguments)
 		int* res;
 
 		pthread_join(thread_ids[i], (void *) &res);
-		
+		thread_times[i] = get_ustime_sec() - thread_times[i];
+
 		total_found += *res;
 	}
 
 	total_cost = get_ustime_sec() - start_time;
 
-	sprintf(results_str, "|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec)\n",
+	sprintf(results_str, "|Random-Read	(done:%ld, found:%ld): %.6f sec/op; %.1f reads /sec(estimated); cost:%.6f(sec); avg thread cost:%.6f(sec)\n",
 			args->requests_num, total_found,
 			(double) (total_cost / args->requests_num),
 			(double) (args->requests_num / total_cost),
-			(double) total_cost);
+			(double) total_cost,
+			calc_avg_cost(thread_times, args->thread_num));
 	
 	free(args);
 	return results_str;
@@ -99,6 +111,7 @@ void* create_writers(void* arguments)
 
 	pthread_t thread_ids[args->thread_num];
 
+	long long thread_times[args->thread_num];
 	long long start_time = get_ustime_sec();
 	
 	// Create Threads
@@ -109,18 +122,24 @@ void* create_writers(void* arguments)
 		thread_p->load = args->requests_num/args->thread_num;
 		thread_p->db_p = args->db_pointer;
 
+		thread_times[i] = get_ustime_sec();
 		pthread_create(&thread_ids[i], NULL, _write_test, (void *) thread_p);
 	}
 
 	// Terminate Threads
 	for (int i = 0; i < args->thread_num; i++)
+	{
 		pthread_join(thread_ids[i], NULL);
+		thread_times[i] = get_ustime_sec() - thread_times[i];
+	}
+		
 	
 	double total_cost = get_ustime_sec() - start_time;
 
-	sprintf(results_str, "|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec);\n",
+	sprintf(results_str, "|Random-Write	(done:%ld): %.6f sec/op; %.1f writes/sec(estimated); cost: %.6f(sec); avg thread cost: %.6f(sec)\n",
 			args->requests_num, (double)(total_cost/args->requests_num),
-			(double) (args->requests_num/total_cost), total_cost);
+			(double) (args->requests_num/total_cost), total_cost,
+			calc_avg_cost(thread_times, args->thread_num));
 		
 	free(args);
 	return results_str;
