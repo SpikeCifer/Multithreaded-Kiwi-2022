@@ -132,13 +132,18 @@ int main(int argc, char** argv)
 	char *results_str = (char*)malloc(200*sizeof(char));
 
 	int max_threads = atoi(argv[3]);
+
 	switch (mode)
 	{
 		case READ_MODE:
 		{
 			pthread_t readers_constructor;
-			pthread_create(&readers_constructor, NULL, create_readers,
-				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
+			if (pthread_create(&readers_constructor, NULL, create_readers,
+				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
+			{
+				printf("Error while trying to create readers constructor");
+				exit(0);
+			}
 
 			pthread_join(readers_constructor, (void **) &results_str);
 			break;
@@ -147,8 +152,12 @@ int main(int argc, char** argv)
 		case WRITE_MODE:
 		{
 			pthread_t writers_constructor;
-			pthread_create(&writers_constructor, NULL, create_writers, 
-				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer));
+			if(pthread_create(&writers_constructor, NULL, create_writers, 
+				(void *) prepare_constructor_data(total_requests, max_threads, db_pointer)) != 0)
+			{
+				printf("Error while trying to create writers constructor");
+				exit(0);
+			}
 
 			pthread_join(writers_constructor, (void **) &results_str);
 			break;
