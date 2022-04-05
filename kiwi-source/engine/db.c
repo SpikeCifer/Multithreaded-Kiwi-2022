@@ -6,6 +6,7 @@
 #include "utils.h"
 #include "log.h"
 
+// -------------LOCK FUNCTIONS -------------------
 void read_lock_db(DB* self)
 {
     pthread_mutex_lock(&self->lock);
@@ -39,7 +40,7 @@ void write_lock_db(DB* self)
 
     self->writers_waiting--;
     self->active_writers++;
-
+    
     pthread_mutex_unlock(&self->lock);
 }
 
@@ -53,6 +54,7 @@ void write_unlock_db(DB* self)
 
     pthread_mutex_unlock(&self->lock);
 }
+// ------------------------------------------------
 
 DB* db_open_ex(const char* basedir, uint64_t cache_size)
 {
@@ -65,13 +67,12 @@ DB* db_open_ex(const char* basedir, uint64_t cache_size)
     Log* log = log_new(self->sst->basedir);
     self->memtable = memtable_new(log);
 
-    pthread_mutex_init(&self->lock, NULL);
-    
+    if(pthread_mutex_init(&self->lock, NULL) != 0)
+        PANIC("Error while trying to initialize db's mutex lock");
+
     if (pthread_cond_init(&self->condition, NULL) != 0)
-    {
-        printf("Error while trying to initialize db's condition variable");
-        exit(0);
-    }
+        PANIC("Error while trying to initialize db's condition variable");
+
     self->writers_waiting = 0;
     self->active_writers = 0; // This is in reality a boolean value
     self->active_readers = 0;
