@@ -1,8 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
-project(kiwi)
+add_executable(${PROJECT_NAME} kiwi.c bench.c)
 
-set(LIBS -lindexer -lpthread -lsnappy)
-set(SOURCES bench.c kiwi.c)
-
-add_executable(kiwi-bench ${SOURCES})
-add_library(${LIBS})
+# set(LIBS -lindexer -lpthread -lsnappy)
+# set(SOURCES bench.c kiwi.c)

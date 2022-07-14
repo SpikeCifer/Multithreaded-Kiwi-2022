@@ -1,4 +1,4 @@
-include ../defs.mk
+include defs.mk
 
 LIBINDEXER_OBJ = \
 	db.o \
