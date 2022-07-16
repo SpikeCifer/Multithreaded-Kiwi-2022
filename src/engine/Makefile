@@ -58,7 +58,7 @@ all: libindexer.a
 
 # ------------------------------- CLEAN ---------------------------
 clean:
-	rm -rf *.o libindexer.a 
+	rm *.o libindexer.a 
 
 .PHONY: clean
 
