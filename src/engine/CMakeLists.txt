@@ -1,1 +1,1 @@
-# For now, do nothing. :-)
+CC=gcc

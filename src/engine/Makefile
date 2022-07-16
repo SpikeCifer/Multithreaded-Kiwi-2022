@@ -1,4 +1,26 @@
-include defs.mk
+CC = gcc
+AR = ar
+STD = -std=c99 -pedantic -DHASH_FUNCTION=HASH_FNV
+DISWARN = -Wno-stringop-overflow -Wno-cpp -Wno-format-truncation -Wno-unused-but-set-variable -Wno-stringop-truncation -Wno-unused-variable
+OPTIMIZATION ?= -O3 -fomit-frame-pointer -funroll-loops
+DEBUG = -g -ggdb
+
+FINAL_CFLAGS = $(STD) -Wall $(OPTIMIZATION) $(DEBUG) $(CFLAGS) $(DISWARN)
+
+FINAL_CC = $(QUIET_CC)$(CC) $(FINAL_CFLAGS)
+FINAL_AR = $(QUIET_AR)$(AR)
+
+# Hide input into stder instead of showin in stdout
+CCCOLOR="\033[34m"
+LINKCOLOR="\033[34;1m"
+SRCCOLOR="\033[33m"
+BINCOLOR="\033[37;1m"
+ENDCOLOR="\033[0m"
+
+ifndef V
+QUIET_CC = @printf '    %b %b\n' $(CCCOLOR)CC$(ENDCOLOR) $(SRCCOLOR)$@$(ENDCOLOR) 1>&2;
+QUIET_AR = @printf '    %b %b\n' $(LINKCOLOR)AR$(ENDCOLOR) $(BINCOLOR)$@$(ENDCOLOR) 1>&2;
+endif
 
 LIBINDEXER_OBJ = \
 	db.o \
@@ -35,7 +57,6 @@ all: libindexer.a
 .PHONY: all
 
 # ------------------------------- CLEAN ---------------------------
-
 clean:
 	rm -rf *.o libindexer.a 
 
