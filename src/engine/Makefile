@@ -23,26 +23,28 @@ LIBINDEXER_OBJ = \
 	log.o \
 	lru.o
 
-LIBINDEXER = libindexer.a
+# --------------------------- COMPILE ---------------------------
+%.o: %.c
+	$(FINAL_CC) -fPIC -c $<
 
-all: $(LIBINDEXER)
+libindexer.a: $(LIBINDEXER_OBJ)
+	$(FINAL_AR) rcs libindexer.a $(LIBINDEXER_OBJ)
+
+all: libindexer.a
 
 .PHONY: all
 
+# ------------------------------- CLEAN ---------------------------
+
+clean:
+	rm -rf *.o libindexer.a 
+
+.PHONY: clean
+
+# ----------------------------- SAVE DEPENDENCIES ----------------------------
 include Makefile.dep
 
 dep:
 	$(FINAL_CC) -MM *.c > Makefile.dep
 
 .PHONY: dep
-
-$(LIBINDEXER): $(LIBINDEXER_OBJ)
-	$(FINAL_AR) rcs $(LIBINDEXER) $(LIBINDEXER_OBJ)
-
-%.o: %.c
-	$(FINAL_CC) -fPIC -c $<
-
-clean:
-	rm -rf *.o $(LIBINDEXER) 
-
-.PHONY: clean
