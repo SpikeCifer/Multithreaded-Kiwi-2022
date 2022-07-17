@@ -1,6 +1,7 @@
 #include "bench.h"
 
-void _gen_random_key(char *key,int length) {
+void _gen_random_key(char *key,int length) 
+{
 	int i;
 	char salt[36]= "abcdefghijklmnopqrstuvwxyz0123456789";
 
