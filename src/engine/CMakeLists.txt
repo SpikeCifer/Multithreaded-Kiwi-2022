@@ -1,10 +1,6 @@
 AUX_SOURCE_DIRECTORY(. SOURCES)
-foreach(source ${SOURCES})
-    message("Source File: ${source}")
-endforeach()
+add_compile_options(-pedantic -D HASH_FUNCTION=HASH_FNV -Wall -g -ggdb) # This does not seem to work
+add_library(indexer ${SOURCES}) # Although this could be a problem when adding new files, we will not be doing so, thus it's fine
 
-add_library(kiwi-engine OBJECT ${SOURCES})
-
-# Each of these files should be compiled into object files
-# using the $(FINAL_CC) -fPIC -c $< command (Not sure which these args 
-# are needed).
+# The following is the compile line arguments (removed a lot from the original)
+# gcc -std=c99 -pedantic -D HASH_FUNCTION=HASH_FNV -Wall -g -ggdb -fPIC -c <.c file>

@@ -87,7 +87,7 @@ int main(int argc,char** argv)
 		if (argc == 4)
 			r = 1;
 		_write_test(count, r);
-		return 1;
+		return EXIT_SUCCESS;
 	}
 
 	if (strcmp(argv[1], "read") == 0) {
@@ -101,10 +101,10 @@ int main(int argc,char** argv)
 
 		_read_test(count, r);
 
-		return 1;
+		return EXIT_SUCCESS;
 
 	} else {
 		fprintf(stderr,"Usage: db-bench <write | read> <count> <random>\n");
-		exit(1);
+		return EXIT_FAILURE;
 	}
 }

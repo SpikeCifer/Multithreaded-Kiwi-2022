@@ -1,11 +1,11 @@
 CC = gcc
 AR = ar
-STD = -std=c99 -pedantic -DHASH_FUNCTION=HASH_FNV
+STD = -std=c99 -pedantic -D HASH_FUNCTION=HASH_FNV
 DISWARN = -Wno-stringop-overflow -Wno-cpp -Wno-format-truncation -Wno-unused-but-set-variable -Wno-stringop-truncation -Wno-unused-variable
 OPTIMIZATION ?= -O3 -fomit-frame-pointer -funroll-loops
 DEBUG = -g -ggdb
 
-FINAL_CFLAGS = $(STD) -Wall $(OPTIMIZATION) $(DEBUG) $(CFLAGS) $(DISWARN)
+FINAL_CFLAGS = $(STD) -Wall $(OPTIMIZATION) $(DEBUG) $(DISWARN)
 
 FINAL_CC = $(QUIET_CC)$(CC) $(FINAL_CFLAGS)
 FINAL_AR = $(QUIET_AR)$(AR)
@@ -50,7 +50,7 @@ LIBINDEXER_OBJ = \
 	$(FINAL_CC) -fPIC -c $<
 
 libindexer.a: $(LIBINDEXER_OBJ)
-	$(FINAL_AR) rcs libindexer.a $(LIBINDEXER_OBJ)
+	$(FINAL_AR) -rcs libindexer.a $(LIBINDEXER_OBJ)
 
 all: libindexer.a
 
