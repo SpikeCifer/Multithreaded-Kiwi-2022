@@ -1,6 +1,5 @@
 #include "bench.h"
 
-
 void _print_header(int count)
 {
 	double index_size = (double)((double)(KSIZE + 8 + 1) * count) / 1048576.0;
@@ -60,16 +59,25 @@ void _print_environment()
 				cache_size);
 	}
 }
-
-int main(int argc,char** argv)
-{
-	long int count;
-
-	srand(time(NULL));
-	if (argc < 3) {
-		fprintf(stderr,"Usage: db-bench <write | read> <count>\n");
-		exit(1);
+int validate_input(int argc, char* request_type) {
+	if (argc < 3 || (strcmp(request_type, "write") != 0 && strcmp(request_type, "read") != 0)) {
+		return 0;
 	}
+
+	return 1;
+}
+
+/* Main funcrion of the program, basically the client
+ * Function must initially validate the input, and then calls the appropriate function
+ */
+int main(int argc,char** argv) {
+	if(!validate_input(argc, argv[1])) {
+		fprintf(stderr, "Usage: db-bench <write | read> <count> <random_mode>\n");
+		return EXIT_FAILURE;
+	}
+
+	long int count;
+	srand(time(NULL));
 
 	if (strcmp(argv[1], "write") == 0) {
 		int r = 0;
@@ -84,8 +92,7 @@ int main(int argc,char** argv)
 
 		return EXIT_SUCCESS;
 	}
-
-	if (strcmp(argv[1], "read") == 0) {
+	else if (strcmp(argv[1], "read") == 0) {
 		int r = 0;
 
 		count = atoi(argv[2]);
@@ -97,9 +104,5 @@ int main(int argc,char** argv)
 		read_requests(count, r);
 
 		return EXIT_SUCCESS;
-
-	} else {
-		fprintf(stderr,"Usage: db-bench <write | read> <count> <random>\n");
-		return EXIT_FAILURE;
-	}
+	} 
 }
