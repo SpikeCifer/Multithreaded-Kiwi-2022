@@ -5,7 +5,16 @@
 
 #define DATAS ("testdb")
 
-void _write_test(long int count, int r)
+void _gen_random_key(char *key,int length) 
+{
+	int i;
+	char salt[36]= "abcdefghijklmnopqrstuvwxyz0123456789";
+
+	for (i = 0; i < length; i++)
+		key[i] = salt[rand() % 36];
+}
+
+void write_requests(long int count, int r)
 {
 	int i;
 	double cost;
@@ -59,7 +68,7 @@ void _write_test(long int count, int r)
 		,cost);
 }
 
-void _read_test(long int count, int r)
+void read_requests(long int count, int r)
 {
 	int i;
 	int ret;

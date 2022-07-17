@@ -15,5 +15,5 @@
 long long get_ustime_sec(void);
 void _gen_random_key(char *key,int length);
 
-void _write_test(long int count, int r);
-void _read_test(long int count, int r);
+void write_requests(long int count, int r);
+void read_requests(long int count, int r);

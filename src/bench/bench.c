@@ -1,13 +1,5 @@
 #include "bench.h"
 
-void _gen_random_key(char *key,int length) 
-{
-	int i;
-	char salt[36]= "abcdefghijklmnopqrstuvwxyz0123456789";
-
-	for (i = 0; i < length; i++)
-		key[i] = salt[rand() % 36];
-}
 
 void _print_header(int count)
 {
@@ -87,7 +79,9 @@ int main(int argc,char** argv)
 		_print_environment();
 		if (argc == 4)
 			r = 1;
-		_write_test(count, r);
+
+		write_requests(count, r);
+
 		return EXIT_SUCCESS;
 	}
 
@@ -100,7 +94,7 @@ int main(int argc,char** argv)
 		if (argc == 4)
 			r = 1;
 
-		_read_test(count, r);
+		read_requests(count, r);
 
 		return EXIT_SUCCESS;
 

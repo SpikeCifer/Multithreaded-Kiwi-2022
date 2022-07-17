@@ -1,6 +1,7 @@
 add_executable(
   bench_test
   bench/bench.cc
+  ../bench/kiwi.c
 )
 
 target_link_libraries(
